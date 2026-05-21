@@ -1,15 +1,23 @@
 """
 Cliente para la ERCOT Public API.
-Extrae precios DA/RT (DC_L, DC_R) y datos de carga y viento.
+Extrae precios DA/RT (DC_L, DC_R) y datos de carga y viento en granularidad HORARIA.
+
+DA  (NP4-190-CD): ya viene horario (hourEnding 1-24) → 1 fila por hora.
+RT  (NP6-905-CD): viene en intervalos de 15 min (deliveryInterval 1-4) →
+                  si la API no ofrece versión horaria, se promedian los 4
+                  intervalos de cada hora → 1 fila por hora.
+Load (NP3-565-CD): hourly por weather zone → 1 fila por hora.
+Wind (NP4-732-CD): hourly → 1 fila por hora.
 """
 import os
+import time
 import requests
 import pandas as pd
-from datetime import datetime, date
+from datetime import timedelta
 
 # ── Credenciales ──────────────────────────────────────────────────────────────
 ERCOT_USERNAME  = os.environ.get("ERCOT_USERNAME",  "mvidals@xiix.mx")
-ERCOT_PASSWORD  = os.environ.get("ERCOT_PASSWORD",  "Cocochou1305#")
+ERCOT_PASSWORD  = os.environ.get("ERCOT_PASSWORD",  "")
 ERCOT_KEY       = os.environ.get("ERCOT_KEY",       "8908c0fc88284dfdbaed3d01955dc934")
 ERCOT_CLIENT_ID = os.environ.get("ERCOT_CLIENT_ID", "fec253ea-0d06-4272-a5e6-b478baeecd70")
 ERCOT_TOKEN_URL = (
@@ -18,6 +26,7 @@ ERCOT_TOKEN_URL = (
 )
 ERCOT_BASE = "https://api.ercot.com/api/public-reports"
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 def get_token() -> str:
@@ -47,52 +56,98 @@ def _headers(token: str) -> dict:
     }
 
 
-def _get_all_pages(token: str, endpoint: str, params: dict) -> list:
-    """Descarga todas las páginas de un endpoint ERCOT."""
+def _get_all_pages(token: str, endpoint: str, params: dict, timeout: int = 90) -> pd.DataFrame:
+    """
+    Descarga todas las páginas de un endpoint ERCOT.
+    La API devuelve data como lista de listas; usa 'fields' para los nombres de columna.
+    Retorna DataFrame con columnas nombradas.
+    """
     hdrs = _headers(token)
-    all_data = []
+    all_rows = []
+    col_names = None
     page = 1
     while True:
         params["page"] = page
-        resp = requests.get(
-            f"{ERCOT_BASE}/{endpoint}",
-            headers=hdrs,
-            params=params,
-            timeout=30,
-        )
-        resp.raise_for_status()
+        for attempt in range(4):
+            resp = requests.get(
+                f"{ERCOT_BASE}/{endpoint}",
+                headers=hdrs,
+                params=params,
+                timeout=timeout,
+            )
+            if resp.status_code == 429:
+                wait = 15 * (attempt + 1)
+                print(f"[ERCOT] Rate limit, esperando {wait}s...")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            break
         js = resp.json()
-        all_data.extend(js.get("data", []))
+
+        # Extraer nombres de columnas de 'fields' (solo primera página)
+        if col_names is None:
+            fields = js.get("fields", [])
+            if fields and isinstance(fields[0], dict):
+                col_names = [f["name"] for f in fields]
+
+        all_rows.extend(js.get("data", []))
         if page >= js.get("_meta", {}).get("totalPages", 1):
             break
         page += 1
-    return all_data
+
+    if not all_rows:
+        return pd.DataFrame()
+
+    # Construir DataFrame con nombres de columna correctos
+    if col_names and isinstance(all_rows[0], list):
+        return pd.DataFrame(all_rows, columns=col_names)
+    # Fallback: la API devolvió dicts (comportamiento antiguo)
+    return pd.DataFrame(all_rows)
+
+
+def _hour_ending_to_ts(df: pd.DataFrame,
+                        date_col: str = "deliveryDate",
+                        hour_col: str = "hourEnding") -> pd.Series:
+    """
+    Convierte deliveryDate + hourEnding a timestamp horario.
+    Acepta dos formatos:
+      - Entero/string numérico: '1' o 1 → 00:00, '24' o 24 → 23:00
+      - 'HH:MM' (ej: '01:00') → hora = HH - 1
+    """
+    base = pd.to_datetime(df[date_col])
+    raw  = df[hour_col].astype(str)
+
+    # Detectar formato 'HH:MM'
+    if raw.str.contains(":").any():
+        horas = raw.str.split(":").str[0].astype(int) - 1
+    else:
+        horas = pd.to_numeric(raw, errors="coerce").fillna(1).astype(int) - 1
+
+    return base + pd.to_timedelta(horas, unit="h")
 
 
 # ── Precios DA ────────────────────────────────────────────────────────────────
 def get_da_prices(token: str, fecha_ini: str, fecha_fin: str,
                   settlement_point: str) -> pd.DataFrame:
     """
-    Precios DA (NP4-190-CD) para un settlement point.
-    Retorna df con columnas: fecha, precio_diario (promedio de 24 horas).
+    Precios DA (NP4-190-CD) — ya vienen horarios (hourEnding 1-24).
+    Retorna df con columnas: fecha (datetime horario), precio_hora.
     """
-    rows = _get_all_pages(token, "np4-190-cd/dam_stlmnt_pnt_prices", {
+    df = _get_all_pages(token, "np4-190-cd/dam_stlmnt_pnt_prices", {
         "deliveryDateFrom": fecha_ini,
         "deliveryDateTo":   fecha_fin,
         "settlementPoint":  settlement_point,
         "size":             1000,
     })
-    if not rows:
-        return pd.DataFrame(columns=["fecha", "precio_diario"])
+    if df.empty:
+        return pd.DataFrame(columns=["fecha", "precio_hora"])
 
-    df = pd.DataFrame(rows)
-    df["fecha"] = pd.to_datetime(df["deliveryDate"])
-    df["settlementPointPrice"] = pd.to_numeric(df["settlementPointPrice"], errors="coerce")
+    df["fecha"] = _hour_ending_to_ts(df, "deliveryDate", "hourEnding")
+    df["precio_hora"] = pd.to_numeric(df["settlementPointPrice"], errors="coerce")
     return (
-        df.groupby("fecha")["settlementPointPrice"]
-        .mean()
+        df.groupby("fecha")["precio_hora"]
+        .mean()                        # por si hubiera duplicados
         .reset_index()
-        .rename(columns={"settlementPointPrice": "precio_diario"})
     )
 
 
@@ -100,108 +155,135 @@ def get_da_prices(token: str, fecha_ini: str, fecha_fin: str,
 def get_rt_prices(token: str, fecha_ini: str, fecha_fin: str,
                   settlement_point: str) -> pd.DataFrame:
     """
-    Precios RT (NP6-905-CD) para un settlement point (intervalos de 15 min).
-    Retorna df con columnas: fecha, precio_diario (promedio del día).
+    Precios RT (NP6-905-CD) — intervalos de 15 min (deliveryInterval 1-4).
+    Se promedian los intervalos de cada hora → 1 fila por hora.
+    Retorna df con columnas: fecha (datetime horario), precio_hora.
     """
-    rows = _get_all_pages(token, "np6-905-cd/spp_node_zone_hub", {
+    df = _get_all_pages(token, "np6-905-cd/spp_node_zone_hub", {
         "deliveryDateFrom": fecha_ini,
         "deliveryDateTo":   fecha_fin,
         "settlementPoint":  settlement_point,
         "size":             1000,
     })
-    if not rows:
-        return pd.DataFrame(columns=["fecha", "precio_diario"])
-
-    df = pd.DataFrame(rows)
-    df["fecha"] = pd.to_datetime(df["deliveryDate"])
+    if df.empty:
+        return pd.DataFrame(columns=["fecha", "precio_hora"])
+    # deliveryHour (1-24) → timestamp horario
+    df["fecha"] = _hour_ending_to_ts(df, "deliveryDate", "deliveryHour")
     df["settlementPointPrice"] = pd.to_numeric(df["settlementPointPrice"], errors="coerce")
+    # Promedio de los intervalos de 15 min dentro de cada hora
     return (
         df.groupby("fecha")["settlementPointPrice"]
         .mean()
         .reset_index()
-        .rename(columns={"settlementPointPrice": "precio_diario"})
+        .rename(columns={"settlementPointPrice": "precio_hora"})
     )
 
 
 # ── Carga del sistema ─────────────────────────────────────────────────────────
 def get_load(token: str, fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     """
-    Carga horaria ERCOT (NP3-565-CD).
-    Retorna df con columnas: fecha, load_mw (promedio diario).
+    Carga horaria ERCOT (NP6-345-CD) — actual system load by weather zone.
+    Retorna df con columnas: fecha (datetime horario), load_mw.
     """
-    rows = _get_all_pages(token, "np3-565-cd/lf_by_model_weather_zone", {
-        "deliveryDateFrom": fecha_ini,
-        "deliveryDateTo":   fecha_fin,
+    df = _get_all_pages(token, "np6-345-cd/act_sys_load_by_wzn", {
+        "operatingDayFrom": fecha_ini,
+        "operatingDayTo":   fecha_fin,
         "size":             1000,
     })
-    if not rows:
+    if df.empty:
         return pd.DataFrame(columns=["fecha", "load_mw"])
 
-    df = pd.DataFrame(rows)
-
-    # Filtrar modelo STLF si está disponible
-    if "model" in df.columns:
-        for pref in ["STLF", "MTLF"]:
-            if pref in df["model"].values:
-                df = df[df["model"] == pref]
-                break
-
-    # Columna de total del sistema
-    load_col = None
-    for cand in ["systemTotal", "total", "systemtotal", "System Total"]:
-        if cand in df.columns:
-            load_col = cand
-            break
-    if load_col is None:
-        return pd.DataFrame(columns=["fecha", "load_mw"])
-
-    df["fecha"] = pd.to_datetime(df["deliveryDate"])
-    df["load_mw"] = pd.to_numeric(df[load_col], errors="coerce")
-    return (
-        df.groupby("fecha")["load_mw"]
-        .mean()
-        .reset_index()
-    )
+    df["fecha"]   = _hour_ending_to_ts(df, "operatingDay", "hourEnding")
+    df["load_mw"] = pd.to_numeric(df["total"], errors="coerce")
+    df = df.drop_duplicates(subset=["fecha"], keep="first")
+    return df[["fecha", "load_mw"]].reset_index(drop=True)
 
 
 # ── Generación eólica ─────────────────────────────────────────────────────────
 _WIND_COLS = [
+    "STWPFSystem",
     "STWPFLoadZoneSouthHouston",
     "STWPFLoadZoneWest",
     "STWPFLoadZoneNorth",
     "STWPFLoadZoneCoastal",
     "STWPFLoadZoneFarWest",
-    "STWPFSystem",
 ]
 
 def get_wind(token: str, fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     """
-    Generación eólica ERCOT (NP4-732-CD).
-    Retorna df con columnas: fecha, wind_mw (promedio diario sistema).
+    Generacion eolica ERCOT (NP4-732-CD) — actual system-wide generation.
+    Consulta dia por dia para evitar timeouts por volumen de revisiones.
+    Retorna df con columnas: fecha (datetime horario), wind_mw.
     """
-    rows = _get_all_pages(token, "np4-732-cd/wpp_hrly_avrg_actl_fcast", {
-        "deliveryDateFrom": fecha_ini,
-        "deliveryDateTo":   fecha_fin,
-        "size":             1000,
-    })
-    if not rows:
+    from datetime import date as _date, timedelta as _td
+    ini = pd.to_datetime(fecha_ini).date()
+    fin = pd.to_datetime(fecha_fin).date()
+    frames = []
+    cur = ini
+    while cur <= fin:
+        fecha_str = cur.strftime("%Y-%m-%d")
+        try:
+            df_day = _get_all_pages(token, "np4-732-cd/wpp_hrly_avrg_actl_fcast", {
+                "deliveryDateFrom": fecha_str,
+                "deliveryDateTo":   fecha_str,
+                "size":             1000,
+            })
+            if not df_day.empty:
+                frames.append(df_day)
+        except Exception as e:
+            print(f"[ERCOT Wind] {fecha_str} fallo: {e}")
+        cur += _td(days=1)
+
+    if not frames:
         return pd.DataFrame(columns=["fecha", "wind_mw"])
 
-    df = pd.DataFrame(rows)
-    df["fecha"] = pd.to_datetime(df["deliveryDate"])
+    df = pd.concat(frames, ignore_index=True)
+    df["fecha"] = _hour_ending_to_ts(df, "deliveryDate", "hourEnding")
 
-    # Buscar columna de total o sumar zonas disponibles
-    total_col = next((c for c in _WIND_COLS if c in df.columns), None)
-    if total_col:
-        df["wind_mw"] = pd.to_numeric(df[total_col], errors="coerce")
-    else:
-        zone_cols = [c for c in df.columns if "STWPF" in c or "wind" in c.lower()]
-        if not zone_cols:
-            return pd.DataFrame(columns=["fecha", "wind_mw"])
-        df["wind_mw"] = df[zone_cols].apply(pd.to_numeric, errors="coerce").sum(axis=1)
+    # genSystemWide = generacion actual total del sistema
+    # postedDatetime DESC -> mas reciente primero -> drop_duplicates conserva la mas reciente
+    df["postedDatetime"] = pd.to_datetime(df["postedDatetime"], errors="coerce")
+    df = df.sort_values("postedDatetime", ascending=False)
+    df["wind_mw"] = pd.to_numeric(df["genSystemWide"], errors="coerce")
+    df = df.drop_duplicates(subset=["fecha"], keep="first")
+    return df[["fecha", "wind_mw"]].sort_values("fecha").reset_index(drop=True)
 
-    return (
-        df.groupby("fecha")["wind_mw"]
-        .mean()
-        .reset_index()
-    )
+
+# ── Generación solar ──────────────────────────────────────────────────────────
+def get_solar(token: str, fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
+    """
+    Generacion solar ERCOT (NP4-745-CD) — actual system-wide PV generation.
+    Consulta dia por dia para evitar timeouts.
+    Retorna df con columnas: fecha (datetime horario), solar_mw.
+    """
+    from datetime import date as _date, timedelta as _td
+    ini = pd.to_datetime(fecha_ini).date()
+    fin = pd.to_datetime(fecha_fin).date()
+    frames = []
+    cur = ini
+    while cur <= fin:
+        fecha_str = cur.strftime("%Y-%m-%d")
+        try:
+            df_day = _get_all_pages(token, "np4-745-cd/spp_hrly_actual_fcast_geo", {
+                "deliveryDateFrom": fecha_str,
+                "deliveryDateTo":   fecha_str,
+                "size":             1000,
+            })
+            if not df_day.empty:
+                frames.append(df_day)
+        except Exception as e:
+            print(f"[ERCOT Solar] {fecha_str} fallo: {e}")
+        cur += _td(days=1)
+
+    if not frames:
+        return pd.DataFrame(columns=["fecha", "solar_mw"])
+
+    df = pd.concat(frames, ignore_index=True)
+    df["fecha"] = _hour_ending_to_ts(df, "deliveryDate", "hourEnding")
+
+    # genSystemWide = generacion actual total del sistema solar
+    df["postedDatetime"] = pd.to_datetime(df.get("postedDatetime", pd.NaT), errors="coerce")
+    df = df.sort_values("postedDatetime", ascending=False)
+    df["solar_mw"] = pd.to_numeric(df["genSystemWide"], errors="coerce")
+    df = df.drop_duplicates(subset=["fecha"], keep="first")
+    return df[["fecha", "solar_mw"]].sort_values("fecha").reset_index(drop=True)

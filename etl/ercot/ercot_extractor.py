@@ -1,60 +1,102 @@
 """
-ETL ERCOT — extrae precios DA/RT (DC_L, DC_R), carga y viento,
-más pronósticos sintéticos de MarginalUnit, y los guarda en XTS.DATOS_ERCOT.
+ETL ERCOT — extrae precios DA/RT (DC_L, DC_R), carga y viento en granularidad
+HORARIA y los guarda en XTS.dbo.DATOS_ERCOT (24 filas por día).
+
+RT para DC_L/DC_R: intenta ERCOT np6-905-cd primero; si devuelve vacío, cae
+automáticamente a Enverus Mosaic como fuente alternativa.
 """
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import pandas as pd
-from datetime import date, timedelta
+from datetime import timedelta
 
-from etl.common.db_connection import get_connection
-from etl.ercot.ercot_api     import get_token, get_da_prices, get_rt_prices, get_load, get_wind
-from etl.ercot.marginalunit_api import get_forecast_daily
+from etl.common.db_connection   import get_connection
+from etl.ercot.ercot_api        import get_token, get_da_prices, get_rt_prices, get_load, get_wind
+from etl.ercot.marginalunit_api import get_forecast_hourly
+from etl.ercot.enverus_api      import get_rt_hourly as env_rt, get_da_hourly as env_da
 
-# Nodos activos en ERCOT
 NODOS = ["DC_L", "DC_R"]
+
+
+def _rt_with_fallback(token: str, fecha_ini: str, fecha_fin: str,
+                      node: str, col: str) -> pd.DataFrame:
+    """
+    Obtiene RT prices para un nodo DC tie.
+    1) Intenta ERCOT np6-905-cd con OAuth.
+    2) Si devuelve vacío, usa Enverus Mosaic como fallback automático.
+    """
+    df = get_rt_prices(token, fecha_ini, fecha_fin, node)
+    if not df.empty:
+        print(f"  [ERCOT RT] {node} -> {len(df)} filas (API pública)")
+        return df.rename(columns={"precio_hora": col})
+
+    print(f"  [ERCOT RT] {node} -> vacío, intentando Enverus...")
+    df_env = env_rt(fecha_ini, fecha_fin, node)
+    if not df_env.empty:
+        print(f"  [Enverus RT] {node} -> {len(df_env)} filas")
+        return df_env.rename(columns={"precio_hora": col})
+
+    print(f"  [RT] {node} -> sin datos de ninguna fuente")
+    return pd.DataFrame(columns=["fecha", col])
+
+
+def _da_with_fallback(token: str, fecha_ini: str, fecha_fin: str,
+                      node: str, col: str) -> pd.DataFrame:
+    """
+    Obtiene DA prices para un nodo DC tie.
+    1) Intenta ERCOT np4-190-cd con OAuth.
+    2) Si devuelve vacío, usa Enverus Mosaic como fallback automático.
+    """
+    df = get_da_prices(token, fecha_ini, fecha_fin, node)
+    if not df.empty:
+        print(f"  [ERCOT DA] {node} -> {len(df)} filas (API pública)")
+        return df.rename(columns={"precio_hora": col})
+
+    print(f"  [ERCOT DA] {node} -> vacío, intentando Enverus...")
+    df_env = env_da(fecha_ini, fecha_fin, node)
+    if not df_env.empty:
+        print(f"  [Enverus DA] {node} -> {len(df_env)} filas")
+        return df_env.rename(columns={"precio_hora": col})
+
+    print(f"  [DA] {node} -> sin datos de ninguna fuente")
+    return pd.DataFrame(columns=["fecha", col])
 
 
 # ── Extracción ────────────────────────────────────────────────────────────────
 def extract_ercot(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     """
-    Extrae datos ERCOT del rango [fecha_ini, fecha_fin] (formato YYYY-MM-DD).
-    Retorna un DataFrame diario con todas las columnas de DATOS_ERCOT
-    que provienen de fuentes ERCOT/MarginalUnit.
+    Extrae datos ERCOT hora por hora para [fecha_ini, fecha_fin].
+    Retorna DataFrame con columnas de DATOS_ERCOT.
     """
-    print(f"[ERCOT] Obteniendo token...")
+    print("[ERCOT] Obteniendo token...")
     token = get_token()
 
     # ── Precios DA ────────────────────────────────────────────────────────────
-    print(f"[ERCOT] Precios DA {fecha_ini} → {fecha_fin}")
-    da_dcl = get_da_prices(token, fecha_ini, fecha_fin, "DC_L").rename(
-        columns={"precio_diario": "DA_DCL"})
-    da_dcr = get_da_prices(token, fecha_ini, fecha_fin, "DC_R").rename(
-        columns={"precio_diario": "DA_DCR"})
+    print(f"[ERCOT] DA prices {fecha_ini} -> {fecha_fin}")
+    da_dcl = _da_with_fallback(token, fecha_ini, fecha_fin, "DC_L", "DA_DCL")
+    da_dcr = _da_with_fallback(token, fecha_ini, fecha_fin, "DC_R", "DA_DCR")
 
-    # ── Precios RT ────────────────────────────────────────────────────────────
-    print(f"[ERCOT] Precios RT {fecha_ini} → {fecha_fin}")
-    rt_dcl = get_rt_prices(token, fecha_ini, fecha_fin, "DC_L").rename(
-        columns={"precio_diario": "RT_DCL"})
-    rt_dcr = get_rt_prices(token, fecha_ini, fecha_fin, "DC_R").rename(
-        columns={"precio_diario": "RT_DCR"})
+    # ── Precios RT (con fallback Enverus) ────────────────────────────────────
+    print(f"[ERCOT] RT prices {fecha_ini} -> {fecha_fin}")
+    rt_dcl = _rt_with_fallback(token, fecha_ini, fecha_fin, "DC_L", "RT_DCL")
+    rt_dcr = _rt_with_fallback(token, fecha_ini, fecha_fin, "DC_R", "RT_DCR")
 
     # ── Carga ─────────────────────────────────────────────────────────────────
-    print(f"[ERCOT] Carga del sistema {fecha_ini} → {fecha_fin}")
+    print(f"[ERCOT] Load {fecha_ini} -> {fecha_fin}")
     df_load = get_load(token, fecha_ini, fecha_fin).rename(
         columns={"load_mw": "LOAD_ERCOT"})
 
     # ── Viento ────────────────────────────────────────────────────────────────
-    print(f"[ERCOT] Generación eólica {fecha_ini} → {fecha_fin}")
+    print(f"[ERCOT] Wind {fecha_ini} -> {fecha_fin}")
     df_wind = get_wind(token, fecha_ini, fecha_fin).rename(
         columns={"wind_mw": "WIND_ERCOT"})
 
-    # ── Pronósticos MarginalUnit ──────────────────────────────────────────────
-    print(f"[MarginalUnit] Pronóstico DA {fecha_ini} → {fecha_fin}")
+    # ── Pronósticos MarginalUnit ───────────────────────────────────────────────
+    print(f"[MarginalUnit] Forecast DA {fecha_ini} -> {fecha_fin}")
     try:
-        df_da_fcst = get_forecast_daily("lmp_da", NODOS, fecha_ini, fecha_fin)
+        df_da_fcst = get_forecast_hourly("lmp_da", NODOS, fecha_ini, fecha_fin)
         if not df_da_fcst.empty:
             df_da_fcst = df_da_fcst.rename(columns={
                 "DC_L_fcst": "DA_DCL_FCST",
@@ -64,9 +106,9 @@ def extract_ercot(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
         print(f"[MarginalUnit] DA forecast falló: {e}")
         df_da_fcst = pd.DataFrame()
 
-    print(f"[MarginalUnit] Pronóstico RT {fecha_ini} → {fecha_fin}")
+    print(f"[MarginalUnit] Forecast RT {fecha_ini} -> {fecha_fin}")
     try:
-        df_rt_fcst = get_forecast_daily("lmp_rt", NODOS, fecha_ini, fecha_fin)
+        df_rt_fcst = get_forecast_hourly("lmp_rt", NODOS, fecha_ini, fecha_fin)
         if not df_rt_fcst.empty:
             df_rt_fcst = df_rt_fcst.rename(columns={
                 "DC_L_fcst": "RT_DCL_FCST",
@@ -76,11 +118,10 @@ def extract_ercot(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
         print(f"[MarginalUnit] RT forecast falló: {e}")
         df_rt_fcst = pd.DataFrame()
 
-    # ── Merge de todas las fuentes por fecha ─────────────────────────────────
-    fechas = pd.date_range(fecha_ini, fecha_fin, freq="D").to_frame(
-        index=False, name="fecha")
+    # ── Merge por timestamp horario ───────────────────────────────────────────
+    horas = pd.date_range(fecha_ini, fecha_fin + " 23:00", freq="h")
+    df = pd.DataFrame({"fecha": horas})
 
-    df = fechas
     for parte in [da_dcl, da_dcr, rt_dcl, rt_dcr, df_load, df_wind]:
         if not parte.empty:
             df = df.merge(parte, on="fecha", how="left")
@@ -100,66 +141,44 @@ def upsert_ercot(df: pd.DataFrame) -> None:
         print("[ERCOT] Sin datos para guardar.")
         return
 
-    conn = get_connection("XTS")
+    conn   = get_connection("XTS")
     cursor = conn.cursor()
 
-    # Columnas que esta ETL puede actualizar (CENACE las llena por separado)
     ercot_cols = [
         "DA_DCL", "DA_DCR", "RT_DCL", "RT_DCR",
         "LOAD_ERCOT", "WIND_ERCOT",
         "DA_DCL_FCST", "DA_DCR_FCST",
         "RT_DCL_FCST", "RT_DCR_FCST",
     ]
-    # Solo actualizar columnas que existen en el df
     update_cols = [c for c in ercot_cols if c in df.columns]
 
     for _, row in df.iterrows():
-        fecha = row["fecha"].date() if hasattr(row["fecha"], "date") else row["fecha"]
-
-        # Verificar si ya existe la fila
         cursor.execute(
-            "SELECT COUNT(*) FROM DATOS_ERCOT WHERE FECHA = ?", fecha)
+            "SELECT COUNT(*) FROM DATOS_ERCOT WHERE fecha = ?", row["fecha"])
         existe = cursor.fetchone()[0]
 
+        col_vals = {c: (float(row[c]) if pd.notna(row.get(c)) else None)
+                    for c in update_cols}
+
         if existe:
-            sets = ", ".join(
-                f"{c} = ?" for c in update_cols
-                if row.get(c) is not None and not _isnan(row.get(c))
-            )
-            vals = [
-                row[c] for c in update_cols
-                if row.get(c) is not None and not _isnan(row.get(c))
-            ]
+            sets = ", ".join(f"{c} = ?" for c, v in col_vals.items() if v is not None)
+            vals = [v for v in col_vals.values() if v is not None]
             if sets:
                 cursor.execute(
-                    f"UPDATE DATOS_ERCOT SET {sets} WHERE FECHA = ?",
-                    *vals, fecha
+                    f"UPDATE DATOS_ERCOT SET {sets} WHERE fecha = ?",
+                    *vals, row["fecha"]
                 )
         else:
-            all_cols = ["FECHA"] + [
-                c for c in update_cols
-                if row.get(c) is not None and not _isnan(row.get(c))
-            ]
-            all_vals = [fecha] + [
-                row[c] for c in update_cols
-                if row.get(c) is not None and not _isnan(row.get(c))
-            ]
-            placeholders = ", ".join("?" * len(all_vals))
+            filled = {c: v for c, v in col_vals.items() if v is not None}
+            cols   = ["fecha"] + list(filled.keys())
+            vals   = [row["fecha"]] + list(filled.values())
+            ph     = ", ".join("?" * len(vals))
             cursor.execute(
-                f"INSERT INTO DATOS_ERCOT ({', '.join(all_cols)}) "
-                f"VALUES ({placeholders})",
-                *all_vals
+                f"INSERT INTO DATOS_ERCOT ({', '.join(cols)}) VALUES ({ph})",
+                *vals
             )
 
     conn.commit()
     cursor.close()
     conn.close()
-    print(f"[ERCOT] {len(df)} registros guardados en DATOS_ERCOT.")
-
-
-def _isnan(v) -> bool:
-    try:
-        import math
-        return math.isnan(float(v))
-    except (TypeError, ValueError):
-        return False
+    print(f"[ERCOT] {len(df)} filas guardadas en DATOS_ERCOT.")

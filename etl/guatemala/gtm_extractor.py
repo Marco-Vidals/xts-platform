@@ -1,12 +1,15 @@
 """
 ETL Guatemala — extrae:
-  - POE (precio spot) del Excel diario del AMM (amm.org.gt)
-  - LBR (precio nodo 09LBR-230) de CENACE PML MDA
+  - PPOE (precio programado/forecast) del Excel diario del AMM programas_despacho
+  - POE  (precio real spot) del ZIP post_despacho POSDESPACHO_DIARIO
+  - LBR  (precio nodo 09LBR-230) de CENACE PML MDA
   - Inserta/actualiza en XTS.dbo.GTM (24 filas por dia)
 
-URL AMM: https://www.amm.org.gt/pdfs2/programas_despacho/
-         01_PROGRAMAS_DE_DESPACHO_DIARIO/{año}/
-         01_PROGRAMAS_DE_DESPACHO_DIARIO/{MM}_{MES}/WEB{ddmmYYYY}.xlsx
+URL PPOE: https://www.amm.org.gt/pdfs2/programas_despacho/
+          01_PROGRAMAS_DE_DESPACHO_DIARIO/{año}/
+          01_PROGRAMAS_DE_DESPACHO_DIARIO/{MM}_{MES}/WEB{ddmmYYYY}.xlsx
+URL POE:  https://www.amm.org.gt/pdfs2/post_despacho/POSDESPACHO_DIARIO/
+          {año}/{MM}_{MES}/PD{yyyymmdd}.zip
 """
 import sys
 import os
@@ -14,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import io
 import json
+import zipfile
 import urllib.request
 import requests
 import pandas as pd
@@ -47,21 +51,61 @@ def _amm_url(fecha: date) -> str:
     )
 
 
-def get_poe(fecha: date) -> pd.Series:
+def get_ppoe(fecha: date) -> pd.Series:
     """
-    Descarga el Excel del AMM y extrae las 24 horas del POE.
-    Retorna una Series de 24 valores float (USD/MWh) o NaN si no hay datos.
+    Descarga el Excel de programas_despacho y extrae las 24 horas del PPOE (forecast).
+    Retorna una Series de 24 valores float (USD/MWh) o None si no hay datos.
     """
     url = _amm_url(fecha)
     try:
         with urllib.request.urlopen(url, timeout=30) as resp:
             data = resp.read()
         df = pd.read_excel(io.BytesIO(data), sheet_name="POE", skiprows=8, header=None)
-        poe = pd.to_numeric(df.iloc[0:24, 4], errors="coerce")
+        ppoe = pd.to_numeric(df.iloc[0:24, 4], errors="coerce")
+        ppoe.index = range(24)
+        return ppoe
+    except Exception as e:
+        print(f"[GTM] PPOE no disponible para {fecha}: {e}")
+        return pd.Series([None] * 24)
+
+
+# Alias de compatibilidad para código existente
+get_poe = get_ppoe
+
+
+def _posdespacho_url(fecha: date) -> str:
+    yyyy = fecha.strftime("%Y")
+    mm   = fecha.strftime("%m")
+    mes  = _MESES[mm]
+    yyyymmdd = fecha.strftime("%Y%m%d")
+    return (
+        f"https://www.amm.org.gt/pdfs2/post_despacho/POSDESPACHO_DIARIO/{yyyy}/"
+        f"{mm}_{mes}/PD{yyyymmdd}.zip"
+    )
+
+
+def get_poe_real(fecha: date) -> pd.Series:
+    """
+    Descarga el ZIP de post_despacho y extrae las 24 horas del POE real (spot).
+    Retorna una Series de 24 valores float (USD/MWh) o None si no hay datos.
+    El archivo suele estar disponible al dia siguiente del despacho.
+    """
+    url = _posdespacho_url(fecha)
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = resp.read()
+        z = zipfile.ZipFile(io.BytesIO(data))
+        xl_name = next((n for n in z.namelist() if n.lower().endswith(".xlsx")), None)
+        if not xl_name:
+            raise ValueError("No xlsx in ZIP")
+        df = pd.read_excel(io.BytesIO(z.read(xl_name)), sheet_name="POE",
+                           skiprows=5, header=None)
+        # Fila 0 = encabezado, filas 1-24 = horas 0-23
+        poe = pd.to_numeric(df.iloc[1:25, 5], errors="coerce")
         poe.index = range(24)
         return poe
     except Exception as e:
-        print(f"[GTM] POE no disponible para {fecha}: {e}")
+        print(f"[GTM] POE real no disponible para {fecha}: {e}")
         return pd.Series([None] * 24)
 
 
@@ -90,21 +134,23 @@ def get_lbr(fecha: date) -> pd.Series:
 # ── Extracción principal ──────────────────────────────────────────────────────
 def extract_gtm(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     """
-    Extrae POE y LBR para cada dia en [fecha_ini, fecha_fin].
-    Retorna DataFrame con columnas: fecha (datetime, hora por hora), PPOE, LBR.
+    Extrae PPOE, POE real y LBR para cada dia en [fecha_ini, fecha_fin].
+    Retorna DataFrame con columnas: fecha (datetime, hora por hora), PPOE, POE, LBR.
     """
     rows = []
     for fecha in pd.date_range(fecha_ini, fecha_fin, freq="D"):
         d = fecha.date()
         print(f"[GTM] {d}")
-        poe_series = get_poe(d)
-        lbr_series = get_lbr(d)
+        ppoe_series = get_ppoe(d)
+        poe_series  = get_poe_real(d)
+        lbr_series  = get_lbr(d)
         for hora in range(24):
             ts = datetime.combine(d, datetime.min.time()) + timedelta(hours=hora)
             rows.append({
                 "fecha": ts,
-                "PPOE":  poe_series[hora] if hora < len(poe_series) else None,
-                "LBR":   lbr_series[hora] if hora < len(lbr_series) else None,
+                "PPOE":  ppoe_series[hora] if hora < len(ppoe_series) else None,
+                "POE":   poe_series[hora]  if hora < len(poe_series)  else None,
+                "LBR":   lbr_series[hora]  if hora < len(lbr_series)  else None,
             })
     return pd.DataFrame(rows)
 
@@ -124,17 +170,18 @@ def upsert_gtm(df: pd.DataFrame) -> None:
         existe = cursor.fetchone()[0]
 
         ppoe = row["PPOE"] if pd.notna(row.get("PPOE")) else None
+        poe  = row["POE"]  if pd.notna(row.get("POE"))  else None
         lbr  = row["LBR"]  if pd.notna(row.get("LBR"))  else None
 
         if existe:
             cursor.execute(
-                "UPDATE GTM SET PPOE = ?, LBR = ? WHERE fecha = ?",
-                ppoe, lbr, row["fecha"]
+                "UPDATE GTM SET PPOE = ?, POE = ?, LBR = ? WHERE fecha = ?",
+                ppoe, poe, lbr, row["fecha"]
             )
         else:
             cursor.execute(
-                "INSERT INTO GTM (fecha, PPOE, LBR) VALUES (?, ?, ?)",
-                row["fecha"], ppoe, lbr
+                "INSERT INTO GTM (fecha, PPOE, POE, LBR) VALUES (?, ?, ?, ?)",
+                row["fecha"], ppoe, poe, lbr
             )
 
     conn.commit()

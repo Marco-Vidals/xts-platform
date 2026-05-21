@@ -23,6 +23,7 @@ BANXICO_TOKEN  = os.environ.get("BANXICO_TOKEN", "")
 BANXICO_SERIES = "SF43718"   # Tipo de cambio FIX USD/MXN
 BANXICO_BASE   = "https://www.banxico.org.mx/SieAPIRest/service/v1"
 FRANKFURTER    = "https://api.frankfurter.app"
+FAWAZ_CDN      = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{date}/v1/currencies/usd.json"
 
 
 # ── Banxico SIE ───────────────────────────────────────────────────────────────
@@ -45,11 +46,11 @@ def _banxico(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     return df[["fecha", "TC"]].dropna()
 
 
-# ── Frankfurter (respaldo) ────────────────────────────────────────────────────
+# ── Frankfurter (respaldo 1) ──────────────────────────────────────────────────
 def _frankfurter(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     """Tasa de mercado USD/MXN de Frankfurter (ECB data)."""
     url = f"{FRANKFURTER}/{fecha_ini}..{fecha_fin}"
-    resp = requests.get(url, params={"from": "USD", "to": "MXN"}, timeout=20)
+    resp = requests.get(url, params={"from": "USD", "to": "MXN"}, timeout=30)
     resp.raise_for_status()
     js = resp.json()
     rates = js.get("rates", {})
@@ -57,22 +58,57 @@ def _frankfurter(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("fecha").reset_index(drop=True)
 
 
+# ── Fawazahmed CDN (respaldo 2, fecha por fecha) ──────────────────────────────
+def _fawaz_range(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
+    """
+    Descarga TC de cdn.jsdelivr.net/@fawazahmed0/currency-api.
+    Hace una peticion por dia (mismo CDN que usa APP_Claude.py para live TC).
+    """
+    ini = date.fromisoformat(fecha_ini)
+    fin = date.fromisoformat(fecha_fin)
+    rows = []
+    d = ini
+    while d <= fin:
+        try:
+            url = FAWAZ_CDN.format(date=d.isoformat())
+            resp = requests.get(url, timeout=15, verify=False)
+            if resp.ok:
+                mxn = resp.json().get("usd", {}).get("mxn")
+                if mxn:
+                    rows.append({"fecha": pd.Timestamp(d), "TC": float(mxn)})
+        except Exception:
+            pass
+        d += timedelta(days=1)
+    return pd.DataFrame(rows)
+
+
 # ── Extracción principal ──────────────────────────────────────────────────────
 def extract_tipo_cambio(fecha_ini: str, fecha_fin: str) -> pd.DataFrame:
     """
     Obtiene el tipo de cambio USD/MXN para el rango dado.
-    Intenta Banxico primero; si falla, usa Frankfurter.
+    Orden: Banxico -> Frankfurter -> Fawazahmed CDN.
     """
     try:
         print("[TC] Consultando Banxico SIE...")
         df = _banxico(fecha_ini, fecha_fin)
-        print(f"[TC] Banxico OK — {len(df)} registros")
-        return df
+        if not df.empty:
+            print(f"[TC] Banxico OK - {len(df)} registros")
+            return df
     except Exception as e:
-        print(f"[TC] Banxico falló ({e}), usando Frankfurter...")
+        print(f"[TC] Banxico fallo ({e})")
 
-    df = _frankfurter(fecha_ini, fecha_fin)
-    print(f"[TC] Frankfurter OK — {len(df)} registros")
+    try:
+        print("[TC] Intentando Frankfurter...")
+        df = _frankfurter(fecha_ini, fecha_fin)
+        if not df.empty:
+            print(f"[TC] Frankfurter OK - {len(df)} registros")
+            return df
+    except Exception as e:
+        print(f"[TC] Frankfurter fallo ({e})")
+
+    print("[TC] Usando Fawazahmed CDN (fecha por fecha)...")
+    df = _fawaz_range(fecha_ini, fecha_fin)
+    print(f"[TC] Fawazahmed OK - {len(df)} registros")
     return df
 
 

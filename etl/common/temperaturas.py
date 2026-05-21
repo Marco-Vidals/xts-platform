@@ -84,6 +84,7 @@ def _get_temps(ciudad: str, lat: float, lon: float,
             "longitude":     lon,
             "hourly":        "temperature_2m",
             "timezone":      "America/Mexico_City",
+            "past_days":     2,
             "forecast_days": min((fin - hoy).days + 2, 16),
         }
         resp = requests.get(FORECAST_URL, params=params, timeout=30)
@@ -93,7 +94,7 @@ def _get_temps(ciudad: str, lat: float, lon: float,
             "fecha": pd.to_datetime(js["hourly"]["time"]),
             ciudad:  js["hourly"]["temperature_2m"],
         })
-        # Filtrar solo el rango solicitado
+        # Filtrar solo el rango solicitado (past_days ya incluye ayer, sin gap)
         fcst_ini = max(ini, ayer + timedelta(days=1))
         df_f = df_f[df_f["fecha"].dt.date >= fcst_ini]
         df_f = df_f[df_f["fecha"].dt.date <= fin]
