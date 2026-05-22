@@ -1,0 +1,133 @@
+import pandas as pd 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import style
+import seaborn as sns
+from sklearn import linear_model
+import statsmodels.api as sm
+from scipy import stats
+from scipy.stats import pearsonr
+from statsmodels.distributions.empirical_distribution import ECDF
+from scipy.stats import ks_2samp
+import pingouin as pg
+
+ercot=pd.read_excel('analisis.xlsx',index_col=0)
+ercot.info()
+
+fig, ax=plt.subplots(1,1,figsize=(6,4))
+ax.scatter(x=ercot.Wind,y=ercot.DCR_Rt,alpha=0.8)
+ax.set_xlabel('Wind')
+ax.set_ylabel('DCR_Rt')
+
+fig, ax=plt.subplots(1,1,figsize=(6,4))
+ax.scatter(x=ercot.Wind,y=ercot.DCL_DA,alpha=0.8)
+ax.set_xlabel('Wind')
+ax.set_ylabel('DCL_DA')
+ax=plt.gca()
+ax.set_ylim([-80,150])
+
+fig, ax=plt.subplots(1,1,figsize=(6,4))
+ax.scatter(x=ercot.Fecha,y=ercot.DCL_DA,alpha=0.8)
+ax.set_xlabel('Fecha')
+ax.set_ylabel('DCL_DA')
+ax=plt.gca()
+ax.set_ylim([-80,150])
+
+#Normalidad
+fig, axs= plt.subplots(nrows=1,ncols=2,figsize=(10,4))
+axs[0].hist(x=ercot.DCR_DA,bins=20, alpha=0.5)
+axs[0].plot(ercot.DCR_DA,np.full_like(ercot.DCR_DA,-0.01),'|k',markeredgewidth=1)
+axs[0].set_title('DCR_DA')
+axs[0].set_xlabel('DCR')
+axs[0].set_ylabel('counts')
+
+axs[1].hist(x=ercot.Wind,bins=20, alpha=0.5)
+axs[1].plot(ercot.Wind,np.full_like(ercot.Wind,-0.01),'|k',markeredgewidth=1)
+axs[1].set_title('Wind')
+axs[1].set_xlabel('Wind')
+axs[1].set_ylabel('counts')
+
+fig, axs= plt.subplots(nrows=1,ncols=2,figsize=(10,4))
+axs[0].hist(x=ercot.DCR_Rt,bins=20, alpha=0.5)
+axs[0].plot(ercot.DCR_Rt,np.full_like(ercot.DCR_Rt,-0.01),'|k',markeredgewidth=1)
+axs[0].set_title('DCR_Rt')
+axs[0].set_xlabel('DCR')
+axs[0].set_ylabel('counts')
+
+axs[1].hist(x=ercot.Wind,bins=20, alpha=0.5)
+axs[1].plot(ercot.Wind,np.full_like(ercot.Wind,-0.01),'|k',markeredgewidth=1)
+axs[1].set_title('Wind')
+axs[1].set_xlabel('Wind')
+axs[1].set_ylabel('counts')
+
+fig, da= plt.subplots(nrows=1,ncols=2,figsize=(10,4))
+da[0].hist(x=ercot.DCL_DA,bins=20, alpha=0.5)
+da[0].plot(ercot.DCL_DA,np.full_like(ercot.DCL_DA,-0.01),'|k',markeredgewidth=1)
+da[0].set_title('DCL_DA')
+da[0].set_xlabel('DCL')
+da[0].set_ylabel('counts')
+da[1].hist(x=ercot.DCR_DA,bins=20, alpha=0.5)
+da[1].plot(ercot.DCR_DA,np.full_like(ercot.DCR_DA,-0.01),'|k',markeredgewidth=1)
+da[1].set_title('DCR_DA')
+da[1].set_xlabel('DCR')
+da[1].set_ylabel('counts')
+
+fig, da= plt.subplots(nrows=1,ncols=2,figsize=(10,4))
+da[0].hist(x=ercot.DCL_DA,bins=20, alpha=0.5)
+da[0].plot(ercot.DCL_DA,np.full_like(ercot.DCL_DA,-0.01),'|k',markeredgewidth=1)
+da[0].set_title('DCL_DA')
+da[0].set_xlabel('DCL')
+da[0].set_ylabel('counts')
+da[1].hist(x=ercot.DCL_Rt,bins=20, alpha=0.5)
+da[1].plot(ercot.DCL_Rt,np.full_like(ercot.DCL_Rt,-0.01),'|k',markeredgewidth=1)
+da[1].set_title('DCL_Rt')
+da[1].set_xlabel('DCL')
+da[1].set_ylabel('counts')
+
+
+#Shapiro-wilk test
+test=stats.shapiro(ercot.DCL_Rt)
+
+#Correlacion
+print('C. Pearson:', ercot['DCL_DA'].corr(ercot['Wind'],method='pearson'))
+print('C. Spearman:', ercot['DCL_DA'].corr(ercot['Wind'],method='spearman'))
+print('C. Kendall:', ercot['DCL_DA'].corr(ercot['Wind'],method='kendall'))
+
+print('C. Pearson:', ercot['DCL_DA'].corr(ercot['DCL_Rt'],method='pearson'))
+print('C. Spearman:', ercot['DCL_DA'].corr(ercot['DCL_Rt'],method='spearman'))
+print('C. Kendall:', ercot['DCL_DA'].corr(ercot['DCL_Rt'],method='kendall'))
+
+print('C. Pearson:', ercot['DCL_Rt'].corr(ercot['Wind'],method='pearson'))
+print('C. Spearman:', ercot['DCL_Rt'].corr(ercot['Wind'],method='spearman'))
+print('C. Kendall:', ercot['DCL_Rt'].corr(ercot['Wind'],method='kendall'))
+
+print('C. Pearson:', ercot['Wind'].corr(ercot['DCL_DA'],method='pearson'))
+print('C. Spearman:', ercot['Wind'].corr(ercot['DCL_DA'],method='spearman'))
+print('C. Kendall:', ercot['Wind'].corr(ercot['DCL_DA'],method='kendall'))
+
+#qq
+fig,axs=plt.subplots(nrows=1, ncols=2,figsize=(10,4))
+sm.qqplot(ercot.DCL_DA, fit=True, line='q', alpha=0.4, lw=2, ax=axs[0])
+axs[0].set_title('DCL_DA',fontsize=10, fontweight='bold')
+axs[0].tick_params(labelsize=7)
+sm.qqplot(ercot.DCL_DA, fit=True, line='q', alpha=0.4, lw=2, ax=axs[1])
+axs[1].set_title('DCL_DA',fontsize=10, fontweight='bold')
+axs[1].tick_params(labelsize=7)
+
+#histograma
+fig, ax=plt.subplots()
+ax.hist(ercot.DCL_DA)
+plt.show()
+
+fig, ax=plt.subplots()
+ax.hist(ercot.DCL_Rt)
+plt.show()
+
+fig, ax=plt.subplots()
+ax.hist(ercot.DCR_DA)
+plt.show()
+
+periodo=ercot.index.to_period('M')
+n=ercot.groupby([periodo,ercot.index.time]).sum()
+
+

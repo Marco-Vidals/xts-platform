@@ -1,0 +1,71 @@
+import pandas as pd
+import datetime
+from datetime import timedelta
+import xlwings as xw
+import shutil
+import time
+import numpy as np
+tiempo_inicio = datetime.datetime.now() 
+
+# Fechas para abrir archivos
+fecha = datetime.datetime.now()
+fecha_menos_uno = fecha - timedelta(days = 1)
+fecha_mas_uno = fecha + timedelta(days = 1)
+fecha_fin = (fecha_mas_uno + timedelta(days = 6)) #para capacidades
+fecha_str_ayer = fecha_menos_uno.strftime('%x')
+fecha_str_hoy = fecha.strftime('%x') #mm/dd/aa
+fecha_str_manana = fecha_mas_uno.strftime('%x')
+fecha_str_fin = fecha_fin.strftime('%x')
+anio=fecha_mas_uno.strftime('%Y')
+dia_hoy = fecha_str_hoy[3:5]
+mes_hoy = fecha_str_hoy[0:2]
+anio_hoy = fecha_str_hoy[6:]
+
+anio2 = fecha_str_fin[6:]
+mes2 = fecha_str_fin[0:2]
+dia2 = fecha_str_fin[3:5]
+
+dia_manana = fecha_str_manana[3:5]
+mes_manana = fecha_str_manana[0:2]
+anio_manana = fecha_str_manana[6:]
+
+dia_ayer = fecha_str_ayer[3:5]
+mes_ayer = fecha_str_ayer[0:2]
+anio_ayer = fecha_str_ayer[6:]
+
+def movefile(sist,oferta,nodo):
+    original = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\Ofertas Diarias\\20{anio_manana}-{mes_manana}-{dia_manana}_{nodo}.csv'
+    
+    target_file = f'{dia_hoy}-{mes_hoy}-{anio_hoy} {oferta} {nodo}  {dia_manana}-{mes_manana}-{anio_manana} al {dia_manana}-{mes_manana}-{anio_manana}  001-1.csv'
+    
+    target = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\OFERTAS\\{sist}\\{anio}\\{mes_manana}\\{dia_manana}\\{target_file}'
+    shutil.copyfile(original, target)
+
+
+original = r'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\AGREED_CAISO_ERCOT.xlsx'
+target_file = f'XIIX-SENA operations for {mes_manana}-{dia_manana}-20{anio_manana}-1.xlsx'
+target = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\AGREED TRANSACTIONS\\{anio}\\{mes_manana}\\{target_file}'
+shutil.copyfile(original, target)
+
+print(target)
+
+
+try:
+    movefile('CAISO','compra','M02407IVY01')
+    movefile('CAISO','compra','M02407OMS01')
+    movefile('CAISO','venta','M02407IVYIMP')
+    movefile('CAISO','venta','M02407OMSIMP')
+    
+    movefile('SIN','compra','M02406EAP01')
+    movefile('SIN','compra','M02406LAA01')
+    movefile('SIN','compra','M02406RRD01')
+    movefile('SIN','compra','M02402GUA01')
+    movefile('SIN','venta','M02406EAPIMP')
+    movefile('SIN','venta','M02406LAAIMP')
+    movefile('SIN','venta','M02406RRDIMP')
+    movefile('SIN','venta','M02402GUAIMP')
+except: 
+    print("El API no funciona, revisa los archivos")
+
+
+

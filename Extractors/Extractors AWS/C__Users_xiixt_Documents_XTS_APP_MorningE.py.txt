@@ -1,0 +1,148 @@
+from selenium import webdriver
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import urllib.request
+import shutil
+import re
+import os
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+import pytemperature
+import pyodbc
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTS_operations.XiiX'
+
+fhoy=datetime.datetime.today()
+hoy=fhoy.strftime('%x')
+dmas1=fhoy+timedelta(days=1)
+fecha=dmas1.strftime('%x')
+dmenos1=fhoy-timedelta(days=1)
+fmenos=dmenos1.strftime('%x')
+dmenos2=fhoy-timedelta(days=2)
+fm2=dmenos2.strftime('%x')
+nextweek=fhoy+timedelta(days=7)
+nxtwk=nextweek.strftime('%x')
+samedayfmm=fhoy-timedelta(days=6)
+sdfmm=samedayfmm.strftime('%x')
+
+conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+a=conx.cursor()
+    
+def diatable(dia,tabla):
+    dr=dia.replace(hour=0,minute=0,second=0,microsecond=0)
+    d24=dr+timedelta(hours=23)
+    consulta=f"select * from {tabla} where fecha between '{dr}' and '{d24}'"
+    a.execute(consulta)
+    resultado=a.fetchall()
+    return resultado
+def columna(lista,col):
+    l=[]
+    for i in range(24):
+        df=lista[i][col]
+        l.append(df)
+    return l
+
+tc=diatable(fhoy,'Tipo_Cambio')
+today = datetime.date.today()
+
+driver= webdriver.Firefox()
+driver.get('https://www.cenace.gob.mx/Paginas/SIM/Reportes/CapacidadTransferMDA.aspx')
+time.sleep(random.uniform(8,15))
+files=driver.find_element('xpath','//input[@id="ContentPlaceHolder1_gvReportes_imgBtnCSV_0"]')
+files=driver.find_element('xpath','//input[@id="ContentPlaceHolder1_gvReportes_imgBtnCSV_0"]')
+files.click()
+time.sleep(random.uniform(3,8))
+driver.close()
+
+segundo_str = '00'
+for i in range(65):
+    try:
+        nombre_archivo_SIN = f'Cap Transferencia SIN Periodo 20{fecha[6:]}-{fecha[:2]}-{fecha[3:5]} al 20{nxtwk[6:]}-{nxtwk[:2]}-{nxtwk[3:5]} v20{hoy[6:]} {hoy[:2]} {hoy[3:5]}_08 00 {segundo_str}.csv'
+        path_lectura_SIN = f'C:\\Users\\Administrator\\Downloads\\{nombre_archivo_SIN}'
+        newcap=os.path.join('C:\\Users\\Administrator\\Downloads\\CapacidadErcot.csv')
+        shutil.move(path_lectura_SIN, newcap)
+        dat_SIN_cap = pd.read_csv(newcap, skiprows = 7)
+    except:
+        segundo_int = int(segundo_str) + 1
+        segundo_str = ("%02d" % segundo_int)
+        if segundo_str=='61':
+            dat_SIN_cap= pd.DataFrame(np.zeros((50, 9)))
+            break
+    else:
+        break
+ceros=pd.DataFrame(np.zeros((1,4)))
+#0:23 y 24:47 cuando sea diferente horario
+cap_laa_imp=dat_SIN_cap.iloc[0:23,4]
+cap_laa_exp=dat_SIN_cap.iloc[0:23,8]
+cap_rrd_imp=dat_SIN_cap.iloc[24:47,4]
+cap_rrd_exp=dat_SIN_cap.iloc[24:47,8]
+capaci=pd.DataFrame(zip(cap_laa_imp,cap_laa_exp,cap_rrd_imp,cap_rrd_exp))
+try:
+    conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+    print('Conexi├│n exitosa')
+except:
+    print('No funcion├│ la conexi├│n')
+    
+c=[1 for i in range(24)]
+dt=datetime.datetime.today()
+dt=dt.replace(hour=0,minute=0,second=0,microsecond=0)
+a=conx.cursor()
+
+consulta='insert into CAPACIDADES (fecha, LAA_IMPO, LAA_EXPO,\
+    RRD_IMPO, RRD_EXPO) values(?,?,?,?,?)'
+try:
+    for i in range(len(capaci)):
+        c[i]=dt+datetime.timedelta(hours=i)
+        a.execute(consulta,c[i],int(capaci.iloc[i,0]),int(capaci.iloc[i,1]),int(capaci.iloc[i,2]),\
+                  int(capaci.iloc[i,3]))
+except:
+    print("Datos existentes")
+#Cuando no estamos con el mismo horario
+capaci=pd.concat([ceros, capaci], axis=0).reset_index()
+
+operations= f'XIIX-SENA operations for {hoy[0:2]}-{hoy[3:5]}-20{hoy[6:]}-1.xlsx'
+ophoy=f'C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\AGREED TRANSACTIONS\\20{hoy[6:]}\\{hoy[0:2]}\\{operations}'
+oprfile=pd.read_excel(ophoy,skiprows=(33))
+
+df=pd.DataFrame({
+    'CAPACIDAD-LAA-IMPO (N)' : capaci.iloc[0:24,1],
+    'CAPACIDAD-LAA -EXPO (N)' : capaci.iloc[0:24,2],
+    'CAPACIDAD-RRD-IMPO  (N)' : capaci.iloc[0:24,3],
+    'CAPACIDAD-RRD-EXPO  (N)' : capaci.iloc[0:24,4],
+    'PRICE RRD-DCR EXP' :oprfile.iloc[0:24,14],
+    'PRICE RRD-DCR IMP' :oprfile.iloc[0:24,33],
+    'PRICE LAA-DCL EXP' :oprfile.iloc[0:24,4],
+    'PRICE LAA-DCL IMP' :oprfile.iloc[0:24,25],
+    'Hoy': [today for i in range(24)],
+    'Tipo de cambio': columna(tc,1)   
+  })
+
+#pd.DataFrame.to_csv(df,'ercotdata.csv')
+wb = xw.Book('C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\MORNING\\A_PRE_MORNINGS_ERCOT_830_910.xlsx')
+sht1 = wb.sheets['Data']
+sht1.range('A1').value=df
+time.sleep(5)
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+
+wb.app.quit()
+
+
+

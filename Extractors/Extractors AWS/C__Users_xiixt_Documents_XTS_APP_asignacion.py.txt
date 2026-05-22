@@ -1,0 +1,92 @@
+import datetime
+import os
+import pandas as pd
+import numpy as np
+import pyodbc
+from datetime import timedelta
+
+
+#SIN
+
+#asig=pd.read_excel('Energ├¡a asignada 10022023 M024-XiiX.xlsx',skiprows=3,usecols=('B:AC'))
+#asig_t=np.transpose(asig)
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+crear=0
+def conexion_bd(server, bd, usuario, password):
+    try:
+        conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+        return conx
+        print('Conexi├│n exitosa')
+    except:
+        print('No funcion├│ la conexi├│n')
+        
+a=conexion_bd(serv,bd,usuario,password)
+cursorcreate=a.cursor()
+
+if crear==1:   
+    fi='23-02-2023'
+    last='28-02-20223'
+    aa1=(datetime.datetime.strptime(fi,'%d-%m-%Y'))
+    #aalast=(datetime.datetime.strptime(last,'%d-%m-%Y'))
+    f=datetime.datetime.now()
+    h=f.replace(hour=0,minute=0,second=0,microsecond=0)
+    
+    
+    
+   
+    
+fi=datetime.datetime.now()+timedelta(days=1)
+aa1=fi.replace(hour=0,minute=0,second=0,microsecond=0)
+for i in range(1):
+    #print(aa1+timedelta(days=i))
+    fecha=aa1+timedelta(days=i)
+    fstr=fecha.strftime('%d%m%Y')
+    print(fstr)
+    try:
+        asig=pd.read_excel(f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\Asignaciones\\BCA\\Energ├¡a asignada {fstr} M024-XiiX.xlsx', skiprows=3,usecols=('B:AC'))
+        asig_t=np.transpose(asig)
+    except:
+        asig_t=pd.DataFrame(np.zeros((28,4)))
+    c=[0 for i in range(24)]
+    for i in range(0,24):
+        c[i]=fecha+timedelta(hours=i)
+    consulta='insert into Asignacion_BCA (fecha,Impo_IVY, Impo_OMS, \
+        Expo_IVY,Expo_OMS)\
+        values (?,?,?,?,?)'
+    for i in range(24):
+        cursorcreate.execute(consulta,c[i],asig_t.iloc[4+i,0],asig_t.iloc[4+i,1],\
+                              asig_t.iloc[4+i,2],asig_t.iloc[4+i,3])
+
+
+#fi=datetime.datetime.now()+timedelta(days=1)
+aa1=fi.replace(hour=0,minute=0,second=0,microsecond=0)
+for i in range(1):
+    #print(aa1+timedelta(days=i))
+    fecha=aa1+timedelta(days=i)
+    fstr=fecha.strftime('%d%m%Y')
+    print(fstr)
+    try:
+        asig=pd.read_excel(f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\Asignaciones\\SIN\\Energ├¡a asignada {fstr} M024-XiiX.xlsx', skiprows=3,usecols=('B:AC'))
+        asig_t=np.transpose(asig)
+    except:
+        asig_t=pd.DataFrame(np.zeros((28,8)))
+    c=[0 for i in range(24)]
+    for i in range(0,24):
+        c[i]=fecha+timedelta(hours=i)
+    consulta='insert into Asignacion_SIN (fecha,Impo_EAP, Impo_LAA, \
+        Impo_RRD,Impo_GUA,Expo_EAP,Expo_LAA,Expo_RRD,Expo_GUA)\
+        values (?,?,?,?,?,?,?,?,?)'
+    for i in range(24):
+        cursorcreate.execute(consulta,c[i],asig_t.iloc[4+i,0],asig_t.iloc[4+i,1],\
+                              asig_t.iloc[4+i,2],asig_t.iloc[4+i,3],\
+                            asig_t.iloc[4+i,4],asig_t.iloc[4+i,5],\
+                            asig_t.iloc[4+i,6],asig_t.iloc[4+i,7])
+
+cursorcreate.commit()
+cursorcreate.close()
+

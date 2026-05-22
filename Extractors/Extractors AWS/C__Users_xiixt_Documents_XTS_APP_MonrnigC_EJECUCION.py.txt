@@ -1,0 +1,32 @@
+import subprocess
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("----------------PROCESO MORNING C INICIADO-----------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+
+subprocess.run(["python", "MorningC.py"])##############ejecutar proceso a las 8.58AM DIARIO
+
+
+import pyodbc
+from datetime import datetime
+
+conn = pyodbc.connect('DRIVER={SQL Server};SERVER=ec2-34-203-113-74.compute-1.amazonaws.com;DATABASE=XTS;UID=sa;PWD=XTSoperations7530159')
+
+cursor = conn.cursor()
+
+nombre = 'MorningC'
+estatus = 'FINALIZADO'
+fecha_hora = datetime.now()  
+
+cursor.execute("""
+INSERT INTO XTS.dbo.CONTROL_PROCESOS (NOMBRE, ESTATUS, FECHA_HORA)
+VALUES (?, ?, ?)
+""", nombre, estatus, fecha_hora)
+
+conn.commit()
+
+conn.close()
+

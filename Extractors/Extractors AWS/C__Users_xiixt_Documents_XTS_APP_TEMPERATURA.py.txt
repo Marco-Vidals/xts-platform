@@ -1,0 +1,135 @@
+from selenium import webdriver
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import pyodbc
+
+print("temperaturas")
+def temp(bd,serv,usuario,password,crear_tabla,accion):
+
+    tij=requests.get('https://weather.com/es-MX/tiempo/horario/l/59cbb23b8a0c4f1a06fd401335006934dd29d2e4631fc7c870adfc4b79cc4027').text
+    mxl=requests.get('https://weather.com/es-MX/tiempo/horario/l/f584d9b7a0cfe045439a48923994d079a6f7fb9ada8f3cb7a9ae3971c664182f').text
+    sndiego=requests.get('https://weather.com/es-MX/tiempo/horario/l/a3e7aa913af874780c5ef2b9a12d89efe24dad966f31b0730e367244f1c851007e60402b4b043ca22f9f54d5e6b7a1e6').text
+    imperial=requests.get('https://weather.com/es-MX/tiempo/horario/l/2c4ecb82d95d1b885ad1900bb62579ce65a9203a08d3c3eb945812e8a3504e56').text
+    laredo=requests.get('https://weather.com/es-MX/tiempo/horario/l/3cad32b5b3b0f05bc49a66ce400a2299989e12a0d6c38f45644a7f9ba7471205b742f7bfb51fb17c1316e0a727aeac25').text
+    newlaredo=requests.get('https://weather.com/es-MX/tiempo/horario/l/Nuevo+Laredo+Tamaulipas?canonicalCityId=3502f670f17c4e51592cbab83ddefe4add88c9780949e91df1b3bd5c8f45f0a2').text
+    reynosa=requests.get('https://weather.com/es-MX/tiempo/horario/l/9bbd26bd66c7ea02be45f6f3e0fe40f04a44c3b90e0121a813c847c837431a02').text
+    mcallen=requests.get('https://weather.com/es-MX/tiempo/horario/l/1df14d590cc57e5073155e7117d655cde274c9898e5d5f1d4ce7ad7d0f89495a').text
+    tapachula=requests.get('https://weather.com/es-MX/weather/hourbyhour/l/72c12ec827e8dfb96831ee3835b52e9f6570d66e5bad046148ae6eb664d6693a').text
+    guate=requests.get('https://weather.com/es-GT/tiempo/horario/l/4cdae8b310a320eea56f50716abab8ce38ca26f42a3ba49cd17b39b98755df53').text
+    # daypart='DetailsSummary--daypartName--2FBp2'
+    # temvalue='DetailsSummary--tempValue--1K4ka'
+    # lluvias='DetailsSummary--precip--1ecIJ'
+    daypart='DetailsSummary--daypartName--kbngc'
+    temvalue='DetailsSummary--tempValue--jEiXE'
+    lluvias='DetailsSummary--precip--1a98O'
+    
+    def clima(url):
+        soup=BeautifulSoup(url,'html.parser')
+        hr=[]
+        temp=[]
+        rain=[]
+        for a in soup.find_all(class_=daypart):
+            hr.append(a.text)
+        for b in soup.find_all(class_=temvalue):
+            b2=(b.text).replace("┬░","")
+            temp.append(b2)
+        for c in soup.find_all('span',{'data-testid':'AccumulationValue'}):
+           c2=(c.text)
+           c3=c2[-2:]
+           if c3=='cm':
+               c4=c2.replace("cm","")
+               c5=(int(c4))*10
+           if c3=='mm':
+               c4=c2.replace("mm","")
+               c5=(c4)
+           rain.append(c5)
+        file=pd.DataFrame(zip(hr,temp,rain),columns=['Hora','Temperatura','% Lluvia'])
+        return file
+    
+    tj=clima(tij).iloc[2:,:]
+    snd=clima(sndiego).iloc[2:,:]
+    mex=clima(mxl).iloc[2:,:]
+    ivy=clima(imperial).iloc[2:,:]
+    nlr=clima(newlaredo).iloc[:,:]
+    lrd=clima(laredo).iloc[:,:]
+    ryn=clima(reynosa).iloc[:,:]
+    mca=clima(mcallen).iloc[:,:]
+    tpc=clima(tapachula).iloc[1:,:]
+    gtm=clima(guate).iloc[1:,:]
+    hr=(datetime.datetime.strptime(snd.iloc[0,0],'%H:%M')).hour
+    #print(tj)
+
+
+    def conexion_SQL():
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+    
+    dt=datetime.datetime.today()#+timedelta(days=1)
+    dt=dt.replace(hour=hr,minute=0,second=0,microsecond=0)
+    dt2=datetime.datetime.today()+timedelta(days=1)
+    dt2=dt2.replace(hour=hr,minute=0,second=0,microsecond=0)
+    c=[1 for i in range(48)]
+    for i in range(48):
+        d=dt2+datetime.timedelta(hours=i)
+        c[i]=dt+datetime.timedelta(hours=i)  
+    a=conexion_SQL()
+    ##La primera vez creamos una tabla
+    if crear_tabla==1:
+        consulta='create table TEMPERATURAS ( fecha datetime primary key , TIJ float,\
+            SND float, MXL float, IVY float, NLR float, LRD float, RYN float, MCA float,\
+                TPC float, Lluvia_TPC float,GTM float, Luvia_GTM float)'
+        cursorCreate=a.cursor()
+        cursorCreate.execute(consulta)
+        cursorCreate.commit()
+        cursorCreate.close()
+        
+    #Actualizamos los datos de hoy
+    if accion==0:
+        cursorinsert=a.cursor()
+        consulta='insert into TEMPERATURAS (fecha,TIJ,SND,MXL,IVY,NLR,LRD,RYN,MCA,\
+             TPC,Lluvia_TPC,GTM,Lluvia_GTM) values(?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        consultau='update TEMPERATURAS set TIJ=?, SND=?, MXL=?, IVY=?,NLR=?,LRD=?, RYN=?, MCA=?,\
+            TPC=?, Lluvia_TPC=?, GTM=?, Lluvia_GTM=? where fecha=?'
+        
+        try:
+            for i in range(24):
+                cursorinsert.execute(consulta,c[22+i],tj.iloc[22+i,1],snd.iloc[22+i,1],mex.iloc[22+i,1],ivy.iloc[22+i,1],nlr.iloc[22+i,1],\
+                                        lrd.iloc[22+i,1],ryn.iloc[22+i,1],(mca.iloc[22+i,1]),(tpc.iloc[22+i,1]),float(tpc.iloc[22+i,2]),gtm.iloc[22+i,1],float(gtm.iloc[22+i,2]))
+                cursorinsert.execute(consultau,int(tj.iloc[i,1]),int(snd.iloc[i,1]),int(mex.iloc[i,1]),int(ivy.iloc[i,1]),(nlr.iloc[i,1]),int(lrd.iloc[i,1]),\
+                                      int(ryn.iloc[i,1]),int(mca.iloc[i,1]),int(tpc.iloc[i,1]),float(tpc.iloc[i,2]),int(gtm.iloc[i,1]),float(gtm.iloc[i,2]),c[i])
+        except:
+            for i in range(25):
+                cursorinsert.execute(consulta,c[21+i],tj.iloc[21+i,1],snd.iloc[21+i,1],mex.iloc[21+i,1],ivy.iloc[21+i,1],nlr.iloc[21+i,1],\
+                                        lrd.iloc[21+i,1],ryn.iloc[21+i,1],(mca.iloc[21+i,1]),(tpc.iloc[21+i,1]),float(tpc.iloc[21+i,2]),gtm.iloc[21+i,1],float(gtm.iloc[21+i,2]))
+                cursorinsert.execute(consultau,int(tj.iloc[i,1]),int(snd.iloc[i,1]),int(mex.iloc[i,1]),int(ivy.iloc[i,1]),(nlr.iloc[i,1]),int(lrd.iloc[i,1]),\
+                                      int(ryn.iloc[i,1]),int(mca.iloc[i,1]),int(tpc.iloc[i,1]),float(tpc.iloc[i,2]),int(gtm.iloc[i,1]),float(gtm.iloc[i,2]),c[i])
+        cursorinsert.commit()
+        cursorinsert.close()
+    
+    if accion==1:
+        cursorupdate=a.cursor()
+        consulta='update TEMPERATURAS set TIJ=?, SND=?, MXL=?, IVY=?,NLR=?,LRD=?, RYN=?, MCA=?,\
+            TPC=?, Lluvia_TPC=?, GTM=?, Luvia_GTM=? where fecha=?'
+            
+        for i in range(24):
+            cursorupdate.execute(consulta,tj.iloc[i,1],snd.iloc[i,1],mex.iloc[i,1],ivy.iloc[i,1],nlr.iloc[i,1],lrd.iloc[i,1],\
+                                 ryn.iloc[i,1],mca.iloc[i,1],tpc.iloc[i,1],tpc.iloc[i,2],gtm.iloc[i,1],gtm.iloc[i,2],c[i])
+        cursorupdate.commit() 
+        cursorupdate.close()    
+    a.close()
+    
+

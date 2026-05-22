@@ -1,0 +1,136 @@
+import requests
+import pandas as pd
+import shutil
+import xmltodict
+import json
+import zipfile
+import xml.etree.ElementTree as ET
+import datetime
+from datetime import timedelta
+import pyodbc
+import time
+import numpy as np
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+
+
+
+def oasisurl(dia,tipo):
+    
+    dt=datetime.datetime.today()-timedelta(days=dia)
+    dt=dt.replace(hour=0,minute=0,second=0,microsecond=0)
+    dt2=dt+timedelta(days=1)
+    start_date = dt.strftime('%Y%m%d')
+    end_date = dt2.strftime('%Y%m%d')
+    """http://oasis.caiso.com/oasisapi/SingleZip?queryname=SLD_REN_FCST&market_run_id=DAM&startdatetime=20230505T07:00-0000&enddatetime=20230506T07:00-0000&version=1"""
+    if tipo=='r':
+        url=f'http://oasis.caiso.com/oasisapi/SingleZip?queryname=SLD_REN_FCST&market_run_id=RTPD&startdatetime={start_date}T07:00-0000&enddatetime={end_date}T07:00-0000&version=1'
+    else:
+        url=f'http://oasis.caiso.com/oasisapi/SingleZip?queryname=SLD_FCST&market_run_id=RTM&execution_type=RTPD&startdatetime={start_date}T07:00-0000&enddatetime={end_date}T07:00-0000&version=1'
+    res = requests.get(url)
+    with open('data.zip', 'wb') as f:
+        f.write(res.content)
+    with zipfile.ZipFile('data.zip', 'r') as zip_ref:
+        file_names = zip_ref.namelist()
+        for file_name in file_names:
+           if file_name.endswith('.xml'): # Aqu├¡ se verifica si el archivo es un archivo xml
+               print(f'El archivo xml es: {file_name}')
+               
+    with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\data.zip', 'r') as zip_ref:
+        zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+    shutil.move(f'C:\\Windows\\SYSTEM32\\{file_name}', 'dataren.xml') 
+    
+    with open('dataren.xml') as xml_file:
+        data_dict = xmltodict.parse(xml_file.read())
+        
+    oasisdata=data_dict['OASISReport']
+    data=oasisdata['MessagePayload']
+    data=data['RTO']
+    data=data['REPORT_ITEM']
+    return data
+
+
+"""0,5:RENEW_FCST_DA_MW - Solar - NP15
+   1,6:RENEW_FCST_DA_MW - Wind - NP15
+   2,7:RENEW_FCST_DA_MW - Solar - SP15
+   3,8:RENEW_FCST_DA_MW - Wind - SP15
+   4,9:RENEW_FCST_DA_MW - Solar - ZP26
+"""
+
+def datos(data,num,title):
+    ahr=[]
+    pr=[]
+    adt=[]
+    int(num)
+    for i in range(len(data[num]['REPORT_DATA'])):
+        a=data[num]['REPORT_DATA'][i]
+        hora=int(a['INTERVAL_NUM'])
+        price=float(a['VALUE'])
+        adate=a['OPR_DATE']
+        ahr.append(hora)
+        pr.append(price)
+        adt.append(adate)
+    file=pd.DataFrame(zip(adt,ahr,pr),columns=['OPR_DATE','HORA','CA_ISO-TAC'])
+    file=file.sort_values(by=['OPR_DATE','HORA'], ascending=True)
+    file=(file.iloc[:,2]).groupby(np.arange(len(file))//4).mean()
+    filef=pd.DataFrame(file)
+    return filef
+
+
+def exp(ac,dia):
+    try:
+        rnw=oasisurl(dia,'r')
+        time.sleep(5)
+        load=oasisurl(dia,'l')
+        
+        snp=datos(rnw, 0, 'S_NP15')
+        s=datos(rnw,2, 'Solar')
+        w=datos(rnw,3, 'Wind')
+        wnp=datos(rnw, 1, 'W_NP15')
+        szp=datos(rnw, 4, 'S_ZP26')
+        wzp=datos(rnw, 5, 'W_ZP26')
+        lrt=datos(load, 11, 'LOAD')
+    except:
+        print('Revisar API')
+        snp=pd.DataFrame(np.zeros((24, 1)))
+        s=pd.DataFrame(np.zeros((24, 1)))
+        w=pd.DataFrame(np.zeros((24, 1)))
+        wnp=pd.DataFrame(np.zeros((24, 1)))
+        szp=pd.DataFrame(np.zeros((24, 1)))
+        wzp=pd.DataFrame(np.zeros((24, 1)))
+        lrt=pd.DataFrame(np.zeros((24, 1)))
+        
+    c=[1 for i in range(24)]
+    dt=datetime.datetime.today()-timedelta(days=dia)
+    dt=dt.replace(hour=0,minute=0,second=0,microsecond=0)
+    a=conx.cursor()
+    
+    if ac == 'update':
+        consulta='update RENERGY_RTPD set SOLAR_SP15_RTPD=?, WIND_SP15_RTPD=?,\
+            SOLAR_NP15_RTPD=?,WIND_NP15_RTPD=?, SOLAR_ZP26_RTPD=?,\
+            WIND_ZP26_RTPD=?,CAISO_LOAD_RTPD=? where fecha=? '
+        try:
+            for i in range(24):
+                c[i]=dt+datetime.timedelta(hours=i)
+                a.execute(consulta,s.iloc[i,0],w.iloc[i,0],snp.iloc[i,0],\
+                          wnp.iloc[i,0],szp.iloc[i,0],wzp.iloc[i,0],\
+                          lrt.iloc[i,0],c[i])
+        except:
+            print("Error, revisar API")   
+    elif ac=='insert':
+        consulta='insert into RENERGY_RTPD (fecha, SOLAR_SP15_RTPD, WIND_SP15_RTPD,\
+            SOLAR_NP15_RTPD,WIND_NP15_RTPD, SOLAR_ZP26_RTPD,WIND_ZP26_RTPD,\
+            CAISO_LOAD_RTPD) values(?,?,?,?,?,?,?,?)'
+        try:
+            for i in range(24):
+                c[i]=dt+datetime.timedelta(hours=i)
+                a.execute(consulta,c[i],s.iloc[i,0],w.iloc[i,0],snp.iloc[i,0],\
+                          wnp.iloc[i,0],szp.iloc[i,0],wzp.iloc[i,0],lrt.iloc[i,0])
+        except:
+            print("Datos existentes")   
+

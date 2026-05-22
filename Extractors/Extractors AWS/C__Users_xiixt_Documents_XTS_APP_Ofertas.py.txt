@@ -1,0 +1,131 @@
+import pandas as pd
+import requests
+import datetime
+from datetime import timedelta
+import numpy as np
+from zeep import Client
+import binascii
+import base64
+import csv
+import io
+import json
+import zipfile36 as zipfile
+import os
+import time
+import shutil
+
+
+
+def eliminar_archivos_por_extension(carpeta, extension):
+    # Verificar si la carpeta existe
+    if os.path.exists(carpeta):
+        for archivo in os.listdir(carpeta):
+            ruta_archivo = os.path.join(carpeta, archivo)
+            try:
+                # Verificar si el archivo tiene la extensi├│n
+                if archivo.endswith(extension):
+                    os.remove(ruta_archivo)
+                    print(f"Se ha eliminado {ruta_archivo}")
+            except Exception as e:
+                print(f"No se pudo eliminar {ruta_archivo}: {e}")
+    else:
+        print(f"La carpeta {carpeta} no existe.")
+
+# Especifica la carpeta y la extensi├│n de los archivos que deseas eliminar
+carpeta_a_limpiar = "C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\Ofertas Diarias"
+extension_a_eliminar = ".csv"  
+
+eliminar_archivos_por_extension(carpeta_a_limpiar, extension_a_eliminar)
+
+
+
+
+
+print('Sistemas:')
+print(" Ercot : 1 ")
+print(" Caiso : 2 ")
+sist=input("┬┐Qu├⌐ sistema se va a validar?")
+
+#toferta='Oferta Compra Energia'
+toferta='Oferta Termica'
+
+def OfertasV(toferta,rows,nfile):
+    hoy=datetime.date.today()
+    dmas1=hoy+timedelta(days=1)
+    fecha=dmas1.strftime('%Y-%m-%d')
+    fhoy=hoy.strftime('%Y-%m-%d')
+    print(fecha)
+    url='https://ws01.cenace.gob.mx:8082/WSRepOfertas/getRepOfertas.asmx?WSDL'
+    client = Client(wsdl=url)
+    archivo  = client.service.RepOfertas("EnriqueXTSBCA",  "XTSENPV1;ce8b182af3910618508b095d5c3eded8cfc637bb", toferta, fecha)
+    decoded_content = base64.b64decode(archivo)
+    name_start=decoded_content.find(b'OF')
+    name_end=decoded_content.find(b'json',name_start)+4
+    name_bytes=decoded_content[name_start:name_end]
+    name=name_bytes.decode()
+    
+    with zipfile.ZipFile(io.BytesIO(decoded_content)) as zip_file:
+        csv_file = zip_file.extract(name)
+        print(f"Extracted json file: {csv_file}")
+        
+    df=pd.read_json(name)
+    newcap=os.path.join('Oferta.json')
+    shutil.move(name, newcap)
+    l=[]
+    nf=[]
+    hrf=[]
+    if toferta == 'Oferta Compra Energia':
+        columnas = ['HORA', 'ID_SUB_INT','DEMANDA_FIJA', 'CO_MW_SEG_01',\
+                'CO_PRECIO_SEG_01', 'CO_MW_SEG_02', 'CO_PRECIO_SEG_02', \
+                'CO_MW_SEG_03', 'CO_PRECIO_SEG_03']
+        rhr=8
+    else:
+        columnas = ['HORA', 'ID_SUB_INT','LIM_DESP_MAX', 'LIM_DESP_MIN', \
+                'CST_OP_MIN', 'OI_MW_01', 'OI_MW_02', 'OI_MW_03', 'OI_MW_04',\
+                'OI_MW_05','OI_MW_06','OI_MW_07','OI_MW_08','OI_MW_09',\
+                'OI_MW_10','OI_MW_11','OI_PRECIO_01','OI_PRECIO_02','OI_PRECIO_03',\
+                'OI_PRECIO_04','OI_PRECIO_05','OI_PRECIO_06','OI_PRECIO_07',\
+                'OI_PRECIO_08','OI_PRECIO_09','OI_PRECIO_10','OI_PRECIO_11',\
+                'ORG_MW_RR10','ORG_PRECIO_RR10','ORG_MW_RNR10','ORG_PRECIO_RNR10',\
+                'ORG_PRECIO_RNR10','ORG_PRECIO_RRS','ORG_MW_RNRS','ORG_PRECIO_RNRS',\
+                'ORG_MW_RREG','ORG_PRECIO_RREG','MEZCLA_COMBUSTIBLE']
+        rhr=7
+    for i in range(len(df)):
+        namef=df.iloc[i,4]
+        file=df.iloc[i,-1]
+        hr=df.iloc[i,rhr]
+        nf.append(namef)
+        hrf.append(hr)
+        for i in range(len(file)):
+            df3=pd.DataFrame([file[i]])
+            l.append(df3)
+    
+    #nff=pd.DataFrame(zip(nf,hrf),columns=['Nodo','Hora'])
+    
+    my_array = np.array(l[rows:rows+24])
+    my_array = my_array.reshape((-1, my_array.shape[-1]))   
+    my_array=pd.DataFrame(my_array)
+    my_array.columns=columnas     
+    
+    my_array.to_csv(f'C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\Ofertas Diarias\\{hrf[nfile][:10]}_{nf[nfile]}.csv',index=False)
+    
+    original = f'C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\Ofertas Diarias\\{hrf[nfile][:10]}_{nf[nfile]}.csv'
+
+
+#CompraSIN
+    # OfertasV('Oferta Compra Energia',0,0)
+    # OfertasV('Oferta Compra Energia',24,1)
+    # OfertasV('Oferta Compra Energia',48,2)
+    # OfertasV('Oferta Compra Energia',72,3)
+    
+    # #VentaSIN
+    # OfertasV('Oferta Termica',0,0)
+    # OfertasV('Oferta Termica',24,1)
+    # OfertasV('Oferta Termica',48,2)
+    # OfertasV('Oferta Termica',72,3)
+    
+    # if sist=='2':
+    #     OfertasV('Oferta Compra Energia',96,4)
+    #     OfertasV('Oferta Compra Energia',120,5)
+    #     OfertasV('Oferta Termica',96,4)
+    #     OfertasV('Oferta Termica',120,5)

@@ -1,0 +1,191 @@
+#Guatemala
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import lxml
+import urllib.request
+import shutil
+import re
+import os
+import pytemperature
+
+
+import locale
+locale.setlocale(locale.LC_ALL,'spanish')
+hoy=datetime.date.today()
+hoy2=hoy.strftime('%d%m%Y')
+anio=hoy2[4:]
+mes=(hoy.strftime('%B')).upper()
+ayer=datetime.date.today()-timedelta(days=1)
+mess=ayer.strftime('%B')
+ymes=(ayer.strftime('%B')).upper()
+ayer2=ayer.strftime('%d%m%Y')
+dby=hoy-timedelta(days=2)
+dby2=dby.strftime('%d%m%Y')
+sdlw=hoy-timedelta(days=6)
+sdlw2=sdlw.strftime('%d%m%Y')
+tmr=(hoy+timedelta(days=1)).strftime('%d%m%Y')
+nw=(hoy+timedelta(days=7)).strftime('%d%m%Y')
+plw=(hoy-timedelta(days=7)).strftime('%d%m%Y')
+plwstr=(hoy-timedelta(days=7)).strftime('%B')
+
+
+url=requests.get('https://www.amm.org.gt/ultpub/ultimas_pub_resul.php').text
+resultados='https://www.amm.org.gt/ultpub/'
+planificacion=f'https://www.amm.org.gt/pdfs2/programas_despacho/01_PROGRAMAS_DE_DESPACHO_DIARIO/{anio}/01_PROGRAMAS_DE_DESPACHO_DIARIO/{hoy2[2:4]}_{mes}/WEB{hoy2}.xlsx'
+planiayer=f'https://www.amm.org.gt/pdfs2/programas_despacho/01_PROGRAMAS_DE_DESPACHO_DIARIO/{ayer2[4:]}/01_PROGRAMAS_DE_DESPACHO_DIARIO/{ayer2[2:4]}_{ymes}/WEB{ayer2}.xlsx'
+soup=BeautifulSoup(url,'lxml')
+ref=(soup.find('a')).get('href')
+#print(planificacion)
+resul='hoy2.zip'
+plan='plan.xlsx'
+plany='plany.xlsx'
+
+#resultados
+with urllib.request.urlopen(f'{resultados}{ref}') as response, open(resul,'wb')  as out_guat:
+    shutil.copyfileobj(response,out_guat)
+with zipfile.ZipFile(f'C:\\Users\\xiixt\\Documents\\XTS\\APP\\{resul}','r') as zip_ref:
+     zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+dfresul=pd.read_excel(f'{dby2[0:2]} {mess} {dby2[4:]}.xlsx',sheet_name='POE',skiprows=5)
+dfresfc=pd.read_excel(f'{dby2[0:2]} {mess} {dby2[4:]}.xlsx',sheet_name='PPOE',skiprows=5)
+
+#planificaci├│n
+with urllib.request.urlopen(planificacion) as response, open(plan,'wb')  as out_guat:
+    shutil.copyfileobj(response,out_guat)
+planh=pd.read_excel('plan.xlsx',sheet_name='POE',skiprows=8)
+
+# #planificacionayer
+with urllib.request.urlopen(planiayer) as response, open(plany,'wb')  as out_guat:
+    shutil.copyfileobj(response,out_guat)
+yplan=pd.read_excel('plany.xlsx',sheet_name='POE',skiprows=8)
+
+def guardar(file,nfile):
+    origen=f'C:\\Users\\xiixt\\Documents\\XTS\\APP\\{file}'
+    target=f'G:\\Unidades compartidas\\BBXTS2.0\\Guatemala\\{nfile}'
+    shutil.copyfile(origen,target)
+
+nresul=f'resul{dby2}.zip'
+nplan=f'plan{hoy2}.xlsx'
+ynplan=f'plany{ayer2}.xlsx'
+
+guardar(resul,nresul)
+guardar(plan,nplan)
+#guardar(plany,ynplan)
+
+#Actuals
+with zipfile.ZipFile('C:\\Users\\xiixt\\Documents\\XTS\\APP\\forecast.zip', 'r') as zip_ref:
+    zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+llbrh=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=1)
+lbrh=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=27)
+
+#SDLW
+with zipfile.ZipFile(f'G:\\Unidades compartidas\\BBXTS2.0\\FORECAST_ENV\\{sdlw2[0:2]}-{sdlw2[2:4]}-{sdlw2[6:]}-forecast.zip','r') as zip_ref:
+    zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+lwlbr=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=27)
+with zipfile.ZipFile(f'G:\\Unidades compartidas\\BBXTS2.0\\GUATEMALA\\resul{plw}.zip','r') as zip_ref:
+    zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+lwpoe=pd.read_excel(f'{plw[0:2]} {plwstr} {plw[4:]}.xlsx',sheet_name='POE',skiprows=5)
+lwfcpoe=pd.read_excel(f'{plw[0:2]} {plwstr} {plw[4:]}.xlsx',sheet_name='PPOE',skiprows=5)
+
+#DBY
+with zipfile.ZipFile(f'G:\\Unidades compartidas\\BBXTS2.0\\FORECAST_ENV\\{ayer2[0:2]}-{ayer2[2:4]}-{ayer2[6:]}-forecast.zip','r') as zip_ref:
+    zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+bylbr=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=27)
+
+#IMP/EXP Asignadas
+url=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/SIN/MDA/{anio}/{hoy2[2:4]}/{hoy2[0:2]}/{anio}/{hoy2[2:4]}/{hoy2[0:2]}/JSON'
+res = requests.get(url)
+res_dict = json.loads(res.content)
+resultados = res_dict['Resultados']
+resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+df_LBR = resultados_api2[3]
+
+#Capacidades
+segundo_str = '00'
+while True:
+    try:
+        nombre_archivo_SIN = f'Cap Transferencia SIN Periodo {tmr[4:]}-{tmr[2:4]}-{tmr[0:2]} al {nw[4:]}-{nw[2:4]}-{nw[0:2]} v{hoy2[4:]} {hoy2[2:4]} {hoy2[0:2]}_08 30 {segundo_str}.csv'
+        path_lectura_SIN = f'C:\\Users\\xiixt\\Downloads\\{nombre_archivo_SIN}'
+        dat_SIN_cap = pd.read_csv(path_lectura_SIN, skiprows = 79)
+    except:
+        segundo_int = int(segundo_str) + 1
+        segundo_str = f'0{segundo_int}'
+    else:
+        break
+
+#Tipo de cambio 
+res_tc = requests.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF60653/datos/oportuno?token=44a87bef665b6d7777a5dce5fe45a4cd39a4d2661e6e507b36ddf8fb0dc11aa2")
+res_dict = json.loads(res_tc.content)
+resultados = res_dict['bmx']['series']
+resultados_api_banxico = [pd.DataFrame.from_dict(resultados[i]['datos']) for i in range(len(resultados))] 
+tipo_de_cambio = pd.to_numeric(resultados_api_banxico[0].iloc[0, 1]) 
+today = datetime.date.today()
+
+
+df=pd.DataFrame({
+    'IMPO-ASIGNADA' : df_LBR['imp_comer_asig'],
+    'EXPO-ASIGNADA' : df_LBR['exp_comer_asig'],
+    'CAPACIDAD IMPO': dat_SIN_cap.iloc[0:24,4],
+    'CAPACIDAD EXPO': dat_SIN_cap.iloc[0:24,8],
+    'LOAD YST':llbrh.iloc[0:24,1],
+    'LOAD TDY':llbrh.iloc[0:24,2],
+    'LOAD FCST':llbrh.iloc[0:24,3],
+    'Temp Tapachula_Hoy ':temp.iloc[0:24,1],
+    '%Lluvia Tapachula_Hoy':temp.iloc[0:24,2],
+    'Temp Tapachula_M':temp.iloc[0:24,3],
+    '%Lluvia Tapachula_M':temp.iloc[0:24,4],
+    'Temp GTM_Hoy':temp.iloc[0:24,5],
+    '%Luvia GTM_Hoy':temp.iloc[0:24,6],
+    'Temp GTM_M':temp.iloc[0:24,7],
+    '%Lluva GTM_M':temp.iloc[0:24,8],
+    'Temp Coban_Hoy ':temp.iloc[0:24,9],
+    '%Lluvia Coban_Hoy':temp.iloc[0:24,10],
+    'Temp Coban_M':temp.iloc[0:24,11],
+    '%Lluvia Coban_M':temp.iloc[0:24,12],
+    'LBR_SDLW':lwlbr.iloc[0:24,1],
+    'LBR DBY':bylbr.iloc[0:24,1],
+    'LBR YST':lbrh.iloc[0:24,1],
+    'LBR TDY':lbrh.iloc[0:24,2],
+    'LBR TM':lbrh.iloc[0:24,3],
+    'POE SDLW REAL':lwpoe.iloc[0:24,5],
+    'POE SDLW FCST':lwfcpoe.iloc[0:24,5],
+    'POE DBY':dfresul.iloc[0:24,5],
+    'POE DBY fcst':dfresfc.iloc[0:24,5],
+    'POE YTD':yplan.iloc[0:24,4],
+    'POE TDY':planh.iloc[0:24,4],
+    'Hoy': today,
+    'Tipo de cambio': tipo_de_cambio
+})
+
+df.index = [i + 1 for i in range(0,24)]
+
+newfile = 'Guatemala.csv'
+path_exp = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\MORNING\\{newfile}'
+pd.DataFrame.to_csv(df, path_exp)
+
+# nombre_archivo_TJI_OMS = f'CAISO2_{hoy2[0:2]}_{hoy2[2:4]}_{hoy2[4:]}.csv'
+# path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico BBCaiso\\{nombre_archivo_TJI_OMS}'
+# pd.DataFrame.to_csv(df, path_exp)
+
+
+#Para la base
+
+# hoy=datetime.date.today()-timedelta(days=1)
+# hoy2=hoy.strftime('%d%m%Y')
+# print(hoy2)
+# url=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/SIN/MDA/{anio}/{hoy2[2:4]}/{hoy2[0:2]}/{anio}/{hoy2[2:4]}/{hoy2[0:2]}/JSON'
+# res = requests.get(url)
+# res_dict = json.loads(res.content)
+# resultados = res_dict['Resultados']
+# resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+# df_LBR = resultados_api2[3]
+# df_LBR['exp_comer_asig']
+

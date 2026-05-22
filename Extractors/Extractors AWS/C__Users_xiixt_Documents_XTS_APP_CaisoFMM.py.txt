@@ -1,0 +1,124 @@
+import requests
+import pandas as pd
+import shutil
+import xmltodict
+import json
+import zipfile
+import xml.etree.ElementTree as ET
+import datetime
+from datetime import timedelta
+import numpy as np
+import math
+import time
+
+
+def dfmm(f,nodo,dia):
+    if f=='h':
+        dd=(dia*24)+8
+        hoy=datetime.datetime.today()-timedelta(days=dia)
+        dmas1=hoy+timedelta(hours=24)
+    if f=='r':
+        fi=input('Fecha inicial ("yyyy-mm-dd") : ')
+        ff=input('Fecha final ("yyyy-mm-dd") : ')
+        try:
+            hoy=datetime.datetime.strptime(fi, '%Y-%m-%d')
+            dmas1=datetime.datetime.strptime(ff, '%Y-%m-%d')+timedelta(hours=8)
+            dias=dmas1-hoy
+        except ValueError:
+            print("Formato de fecha incorrecto. Int├⌐ntalo de nuevo.")
+    
+    start_date = hoy.strftime('%Y%m%d')
+    end_date = dmas1.strftime('%Y%m%d')
+    #nodo='ROA-230_2_N101'
+    hora=dmas1.strftime('%H')
+    
+    url = 'http://oasis.caiso.com/oasisapi/SingleZip'
+    # Definir los par├ímetros de la consulta
+    params = {
+        'queryname': 'PRC_RTPD_LMP',
+        'startdatetime': f'{start_date}T07:00-0000',
+        'enddatetime': f'{end_date}T{hora}:00-0000',
+        'version': '3',
+        'market_run_id': 'RTPD',
+        'node': f'{nodo}'
+    }
+    
+    response = requests.get(url, params=params)
+    
+    with open('data.zip', 'wb') as f:
+        f.write(response.content)
+    
+    #print('┬íDatos descargados y guardados en data.zip!')
+    
+    # Abrir el archivo zip descargado
+    with zipfile.ZipFile('data.zip', 'r') as zip_ref:
+        file_names = zip_ref.namelist()
+        for file_name in file_names:
+           if file_name.endswith('.xml'): # Aqu├¡ se verifica si el archivo es un archivo xml
+               print(f'El archivo xml es: {file_name}')  
+    
+    with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\data.zip', 'r') as zip_ref:
+        zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+    
+    shutil.move(f'C:\\Windows\\SYSTEM32\\{file_name}', 'datafmm.xml') 
+    xml_data = pd.read_xml('datafmm.xml')
+    
+    
+    # Leer el archivo XML
+    with open('datafmm.xml') as xml_file:
+        data_dict = xmltodict.parse(xml_file.read())
+        
+    oasisdata=data_dict['OASISReport']
+    data=oasisdata['MessagePayload']
+    data=data['RTO']
+    data=data['REPORT_ITEM']
+    sz=len(data[0]['REPORT_DATA'])
+    
+    def datos(num,title):
+        hr=[]
+        pr=[]
+        int(num)
+        for i in range(sz):
+            a=(data[num]['REPORT_DATA'][i])
+            hora=int(a['INTERVAL_NUM'])
+            price=float(a['VALUE'])
+            hr.append(hora)
+            pr.append(price)
+        file=pd.DataFrame(zip(hr,pr),columns=['Hora',title])
+        file=file.sort_values(by=['Hora'], ascending=True)
+        file=(file.iloc[:,1]).groupby(np.arange(sz)//4).mean()
+        c=pd.DataFrame([i for i in range(len(file))],columns=['Hora'])
+        df_concat = pd.concat([c, file], axis=1)
+        return df_concat
+    
+    lmp=datos(0,f'LMP_{nodo}')
+    cong=datos(1,f'CONG_{nodo}')
+    engy=datos(2,f'ENERGY_{nodo}')
+    loss=datos(3,f'LOSS_{nodo}')
+    ghg=datos(4,f'GHG_{nodo}')
+
+    na=[pd.NA for i in range(24-len(lmp))]
+    ceros=pd.DataFrame(zip(na,na,na,na,na,na))
+    # ceros=pd.DataFrame(pd.NA((len(lmp), 6)))
+    
+    df_union = pd.merge(engy, loss, on='Hora').merge(ghg,on='Hora')
+    dff_u=pd.merge(lmp, cong, on='Hora').merge(df_union,on='Hora')
+    if (24-len(lmp))>0:
+        dff_u=pd.concat([dff_u, ceros],axis=0)
+        dff_u=dff_u.reset_index()
+    return dff_u
+
+""" Fecha actual f = h 
+    Establecer rangos f = r"""
+    
+# f='h'    
+# roa=dfmm(f,'ROA-230_2_N101')
+# time.sleep(5)
+
+# if f == 'h':
+#     libro='C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\Afternoon\\CAISO_FMM.xlsx'
+# else:
+#     libro='C:\\Users\\xiixt\\Documents\\XTS\\APP\\CAISO_FMM.xlsx'
+# fmm=pd.merge(roa,tji, on='Hora')
+# pd.DataFrame.to_excel(fmm,libro,sheet_name='FMM',startcol=0,index=False)
+

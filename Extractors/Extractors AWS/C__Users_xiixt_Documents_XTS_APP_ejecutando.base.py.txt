@@ -1,0 +1,25 @@
+from datetime import datetime, timedelta
+import time
+import subprocess
+import threading
+
+def tarea():
+    subprocess.run(["python", "C:\\Windows\\System32\\base8AM.py"])
+
+def programar_tarea(hora_programada, minuto_programado):
+    x = datetime.now()
+    y = x.replace(day=x.day, hour=hora_programada, minute=minuto_programado, second=0, microsecond=0)
+    if y < x:
+        y += timedelta(days=1)
+    delta_t = y - x
+
+    secs = delta_t.seconds + 1
+
+    t = threading.Timer(secs, tarea)
+    t.start()
+
+# Programar la tarea para las 10:50 AM
+programar_tarea(11, 52)
+
+while True:
+    time.sleep(1)

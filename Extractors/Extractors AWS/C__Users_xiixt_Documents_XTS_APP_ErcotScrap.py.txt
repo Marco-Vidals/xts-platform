@@ -1,0 +1,131 @@
+import pyodbc 
+import pandas as pd
+import requests
+import json
+from selenium.webdriver.common.by import By
+import pytemperature
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import lxml
+import urllib.request
+import shutil
+import re
+import os
+import datetime
+import glob
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+
+# serv='LAPTOP-VI3QO147' 
+# bd='prueba'
+# usuario='soporte'
+# password='7530159'
+
+
+def ercot(bd,serv,usuario,password,dias):
+    crear=0
+    #def ercot(serv,bd,usuario,password):
+    conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+    an=conx.cursor()    
+    hoyf=datetime.date.today()-timedelta(days=dias)
+    hoyf=hoyf.strftime('%Y%m%d')        
+    ayerf=datetime.date.today()-timedelta(days=dias+1)
+    ayerf=ayerf.strftime('%Y%m%d')    
+    url='http://www.ercot.com/misapp/GetReports.do?reportTypeId=13483&reportTitle=Solar%20Power%20Production%20-%20Hourly%20Averaged%20Actual%20and%20Forecasted%20Values&showHTMLView=&mimicKey'
+    wind='http://www.ercot.com/misapp/GetReports.do?reportTypeId=13028&reportTitle=Wind%20Power%20Production%20-%20Hourly%20Averaged%20Actual%20and%20Forecasted%20Values%20by&showHTMLView=&mimicKey'
+    outage='http://www.ercot.com/misapp/GetReports.do?reportTypeId=13103&reportTitle=Hourly%20Resource%20Outage%20Capacity&showHTMLView=&mimicKey'
+    # hora='25.2302'
+    # salida='outage2'
+    if crear ==0:
+        hoy=datetime.date.today()-timedelta(days=dias)
+        hoy=hoy.strftime('%Y%m%d')
+        hoy=hoy[0:6]
+        h=datetime.datetime.today()-timedelta(days=dias)
+        h=h.replace(hour=0,minute=0,second=0,microsecond=0)
+        ayer=h-timedelta(days=1)
+        print(hoy)
+        def ercotdes(url,hora,salida):
+                link=requests.get(url).text
+                soup=BeautifulSoup(link,'lxml')
+    
+                names=[]
+                urls=[]
+                for a in soup.find_all(class_='labelOptional_ind'):
+                    names.append(a.text)
+    
+                for a in soup.find_all('a'):
+                    ref=a.get('href')
+                    urls.append(ref)
+    
+                df=pd.DataFrame(zip(names,urls),columns=['Nombre','Links'])
+                label=soup.find(class_='labelOptional_ind').text
+                name=label[0:30]
+                file=f'{name}{hoy}{hora}'
+    
+                for i in range(0,150,2):
+                    a=df.iloc[i,0]
+                    b=df.iloc[i,1]
+                    if a[0:43]==file:
+                        break
+    
+                descarga=f'http://www.ercot.com/{b}'
+                kk=f'{salida}_csv.zip'
+                with urllib.request.urlopen(descarga) as response, open(kk,'wb') as out_solar:
+                    shutil.copyfileobj(response,out_solar)
+                
+                with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\{salida}_csv.zip','r') as zip_ref:
+                    zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+                if salida=='solar':
+                    cs=a[0:43]
+                    v=a[48:69]
+                    csv=cs+v
+                else: 
+                    cs=a[0:43]
+                    v=a[48:68]
+                    csv=cs+v
+                
+                sec='00'
+                while True:
+                    try:
+                        csv=f'{cs}{sec}{v}'
+                        solar_csv=os.path.join(f'C:\\Windows\\SYSTEM32\\{csv}.csv')
+                        new=os.path.join(f'C:\\Windows\\SYSTEM32\\{salida}.csv')
+                        new_name=shutil.move(solar_csv,new)
+                    except:
+                        seg=int(sec)+1
+                        sec=("%02d" % seg)
+                    else:
+                        break
+                   
+        ercotdes(url,f'{hoyf[6:]}.0755','solar')
+        ercotdes(wind,f'{hoyf[6:]}.0755','wind')
+        ercotdes(outage,f'{hoyf[6:]}.0802','outage')
+        ercotdes(outage,f'{ayerf[6:]}.2302','outage2')
+        solar=pd.read_csv('solar.csv')
+        wind=pd.read_csv('wind.csv')
+        outage=pd.read_csv('outage.csv')
+        outage2=pd.read_csv('outage2.csv')
+        c=[0 for i in range(48)]
+        d=[0 for i in range(48)]
+        dos=[]
+        cinco=[]
+        for i in range(0,48):
+            c[i]=h+timedelta(hours=i)
+            d[i]=ayer+timedelta(hours=i)
+            #df2=int(outage.iloc[1+i,[2,5]])
+            #dos.append(df2)
+        consulta= 'insert into ERCOT(fecha,O_SOUTH,O_HOUSTON,W_SOUTH,W_WEST,W_NORTH,SOLAR) values(?,?,?,?,?,?,?)'
+        consultau= 'update ERCOT set O_SOUTH=?,O_HOUSTON=?, W_SOUTH=?, W_WEST=?, W_NORTH=?, SOLAR=? where fecha=?'
+        for i in range(0,24):
+            an.execute(consulta,c[i+24],int(outage.iloc[25+i,2]),int(outage.iloc[25+i,5]),wind.iloc[65+i,8],wind.iloc[65+i,12],wind.iloc[65+i,16],solar.iloc[65+i,4])
+        for i in range(0,24):
+            an.execute(consultau,int(outage2.iloc[1+i,2]),int(outage2.iloc[1+i,5]),wind.iloc[16+i,8],wind.iloc[16+i,12],wind.iloc[16+i,16],solar.iloc[16+i,4],d[i])
+        # for i in range(0,24):
+        #     a.execute(consultau,wind.iloc[16+i,8],wind.iloc[16+i,12],wind.iloc[16+i,16],solar.iloc[16+i,4],d[i])
+# ercot(bd,serv,usuario, password

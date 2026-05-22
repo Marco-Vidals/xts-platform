@@ -1,0 +1,75 @@
+import datetime
+
+def iniciar_proceso():
+    import memsim_2
+    print("┬┐Deseas iniciar el .bat?")
+    print("1.- Iniciar App") 
+    print("2.- Cancelar")
+    opcion = input("Introduce tu opci├│n: ")
+
+    if opcion == '1':
+        
+        print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+        print("┬┐Deseas iniciar el proceso de:")
+        print("1.-  ERCOT / SIN") 
+        print("2.-  CAISO")
+        sst = input("Introduce tu opci├│n: ")
+        print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+        print("Seleccione un usuario:")
+        print("1. Pedro")
+        print("2. Ana")
+        print("3. Mateo")
+        sst2= input("Introduce tu opci├│n:")
+
+        if sst == '1':
+            print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+            print("SELECCIONASTE ERCOT / SIN") 
+            print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+            print('0.- Enviar Ofertas en cero (EAP,GUA, LAAIMP y RRDIMP)')
+            print('1.- Enviar compras LAA y RRD')
+            
+            TipoDeEnvio=input('Ingrese el segmento a enviar:')
+            memsim_2.usuario(sst,TipoDeEnvio,sst2)
+            
+            print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+            print("Enviado a las ", datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+            print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+
+            
+        elif sst == '2':
+            print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+            print("SELECCIONASTE CAISO")
+              
+            memsim_2.usuario(sst,'0',sst2)
+            
+            print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+            print("Enviado a las ", datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+            print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+            
+        print("┬┐Deseas verificar las ofertas?")
+        print("1.-  S├¡") 
+        print("2.-  No")
+        of= input("Introduce tu opci├│n:")
+        print("- - - - - - - - - - - - - - - - - - - - - - - - -")
+        
+        if of=='1':
+            import Ofertas
+            #CompraSIN
+            Ofertas.OfertasV('Oferta Compra Energia',0,0)
+            Ofertas.OfertasV('Oferta Compra Energia',24,1)
+            Ofertas.OfertasV('Oferta Compra Energia',48,2)
+            Ofertas.OfertasV('Oferta Compra Energia',72,3)       
+            #VentaSIN
+            Ofertas.OfertasV('Oferta Termica',0,0)
+            Ofertas.OfertasV('Oferta Termica',24,1)
+            Ofertas.OfertasV('Oferta Termica',48,2)
+            Ofertas.OfertasV('Oferta Termica',72,3)
+            if sst=='2':
+                Ofertas.OfertasV('Oferta Compra Energia',96,4)
+                Ofertas.OfertasV('Oferta Compra Energia',120,5)
+                Ofertas.OfertasV('Oferta Termica',96,4)
+                Ofertas.OfertasV('Oferta Termica',120,5)
+
+            
+        
+iniciar_proceso()

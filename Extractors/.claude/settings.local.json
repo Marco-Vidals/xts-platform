@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(schedule)",
+      "Bash(find etl:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:www.caiso.com)",
+      "WebSearch",
+      "WebFetch(domain:opensource.gridstatus.io)",
+      "WebFetch(domain:pyiso.readthedocs.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:oasis-bulk.caiso.com)",
+      "Bash(python3 -c \"import json, sys; data = json.load\\(sys.stdin\\); [print\\(cell['source']\\) if isinstance\\(cell.get\\('source'\\), list\\) else None for cell in data['cells'] if 'entity' in str\\(cell.get\\('source', ''\\)\\)]\")",
+      "Bash(python3 -c \"import sys, html; print\\(html.unescape\\(sys.stdin.read\\(\\)\\)\\)\")",
+      "Bash(python3 -c \"import sys, html; s=sys.stdin.read\\(\\); print\\(html.unescape\\(s\\)\\)\")"
+    ]
+  }
+}

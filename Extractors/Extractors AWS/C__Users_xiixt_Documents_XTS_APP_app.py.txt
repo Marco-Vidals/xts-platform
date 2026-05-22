@@ -1,0 +1,692 @@
+import selenium
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+import pytemperature
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import lxml
+
+tiempo_inicio = datetime.datetime.now()
+
+#C:\Program Files (x86)
+# Descargar archivos con Selenium , buscar que se espere anntes de dar click al de BCA
+PATH = 'C:\Program Files (x86)\chromedriver.exe'
+driver = webdriver.Chrome(PATH)
+driver.get('https://www.cenace.gob.mx/Paginas/SIM/Reportes/CapacidadTransferencia.aspx')
+time.sleep(7)
+boton_SIN = driver.find_element_by_xpath('//*[(@id = "ContentPlaceHolder1_gvReportes_imgBtnCSV_0")]')
+time.sleep(5)
+boton_SIN.click()
+time.sleep(7)
+btn_tog = driver.find_element_by_xpath('//*[(@id = "ContentPlaceHolder1_ddlSistema")] | //*[(@id = "ContentPlaceHolder1_gvReportes_imgBtnCSV_0")]')
+time.sleep(3)
+btn_tog.click()
+time.sleep(3)
+btn_tog.send_keys(Keys.DOWN)
+time.sleep(5)
+btn_tog.send_keys(Keys.RETURN)
+time.sleep(9)
+boton_BCA = driver.find_element_by_xpath('//*[(@id = "ContentPlaceHolder1_gvReportes_imgBtnCSV_0")]')
+boton_BCA.click()
+
+time.sleep(3)
+
+# Deficit y Excedente
+driver.get('https://www.cenace.gob.mx/Paginas/SIM/Reportes/EstimacionDeficExcEnergia.aspx')
+boton_DyE = driver.find_element_by_xpath('//*[(@id = "ctl00_ContentPlaceHolder1_GridRadEDefiExc_ctl00_ctl04_gbccolumn")]')
+boton_DyE.click()
+
+time.sleep(3)
+
+# SOLAR
+driver.get('http://mis.ercot.com/misapp/GetReports.do?reportTypeId=13483&reportTitle=Solar%20Power%20Production%20-%20Hourly%20Averaged%20Actual%20and%20Forecasted%20Values&showHTMLView=&mimicKey')
+boton_1 = driver.find_element_by_xpath('//a')
+boton_1.click()
+# WIND
+driver.get('http://mis.ercot.com/misapp/GetReports.do?reportTypeId=14787&reportTitle=Wind%20Power%20Production%20-%20Hourly%20Averaged%20Actual%20and%20Forecasted%20Values%20by%20Geographical%20Region&showHTMLView=&mimicKey')
+boton_2 = driver.find_element_by_xpath('//a')
+boton_2.click()
+
+# OUTAGES
+driver.get('http://mis.ercot.com/misapp/GetReports.do?reportTypeId=13103&reportTitle=Hourly%20Resource%20Outage%20Capacity&showHTMLView=&mimicKey')
+boton_outages = driver.find_element_by_xpath('//a')
+boton_outages.click()
+
+time.sleep(2)
+driver.close()
+
+html_text = requests.get('http://mis.ercot.com/misapp/GetReports.do?reportTypeId=13483&reportTitle=Solar%20Power%20Production%20-%20Hourly%20Averaged%20Actual%20and%20Forecasted%20Values&showHTMLView=&mimicKey').text
+# Soup:
+soup = BeautifulSoup(html_text, 'lxml')
+label = soup.find(class_ = 'labelOptional_ind')
+nombre_solar_zip = label.text
+
+# Para Wind:
+html_text = requests.get('http://mis.ercot.com/misapp/GetReports.do?reportTypeId=14787&reportTitle=Wind%20Power%20Production%20-%20Hourly%20Averaged%20Actual%20and%20Forecasted%20Values%20by%20Geographical%20Region&showHTMLView=&mimicKey').text
+# Soup:
+soup = BeautifulSoup(html_text, 'lxml')
+label = soup.find(class_ = 'labelOptional_ind')
+nombre_wind_zip = label.text
+
+# Para Outages:
+html_text = requests.get('http://mis.ercot.com/misapp/GetReports.do?reportTypeId=13103&reportTitle=Hourly%20Resource%20Outage%20Capacity&showHTMLView=&mimicKey').text
+# Soup:
+soup = BeautifulSoup(html_text, 'lxml')
+label = soup.find(class_ = 'labelOptional_ind')
+nombre_outage_zip = label.text
+
+with zipfile.ZipFile(f'C:\\Users\\ale_a\\Downloads\\{nombre_solar_zip}') as zip:
+    for member in zip.infolist():
+        with zip.open(member, "r") as infile, open("solar_data.csv", "wb") as outfile:
+            while True:
+                data = infile.read()
+                if not data:
+                    break
+                outfile.write(data)
+
+with zipfile.ZipFile(f'C:\\Users\\ale_a\\Downloads\\{nombre_wind_zip}') as zip:
+    for member in zip.infolist():
+        with zip.open(member, "r") as infile, open("wind_data.csv", "wb") as outfile:
+            while True:
+                data = infile.read()
+                if not data:
+                    break
+                outfile.write(data) 
+
+with zipfile.ZipFile(f'C:\\Users\\ale_a\\Downloads\\{nombre_outage_zip}') as zip:
+    for member in zip.infolist():
+        with zip.open(member, "r") as infile, open("outage_data.csv", "wb") as outfile:
+            while True:
+                data = infile.read()
+                if not data:
+                    break
+                outfile.write(data)
+
+# Nuevo: para no tener que extraer a mano los forecasts
+with zipfile.ZipFile(f'C:\\Users\\ale_a\\Documents\\XTS\\APP\\forecast.zip', 'r') as zip_ref:
+    zip_ref.extractall('C:\\Users\\ale_a\\Documents\\XTS\\APP')
+
+
+# FORECAST SOL
+
+# Fechas para abrir archivos
+fecha = datetime.datetime.now()
+fecha_menos_uno = fecha - timedelta(days = 1)
+fecha_mas_uno = fecha + timedelta(days = 1)
+fecha_fin = (fecha_mas_uno + timedelta(days = 6)) #para capacidades
+fecha_str_ayer = fecha_menos_uno.strftime('%x')
+fecha_str_hoy = fecha.strftime('%x') #mm/dd/aa
+fecha_str_manana = fecha_mas_uno.strftime('%x')
+fecha_str_fin = fecha_fin.strftime('%x')
+
+dia_hoy = fecha_str_hoy[3:5]
+mes_hoy = fecha_str_hoy[0:2]
+anio_hoy = fecha_str_hoy[6:]
+
+anio2 = fecha_str_fin[6:]
+mes2 = fecha_str_fin[0:2]
+dia2 = fecha_str_fin[3:5]
+
+dia_manana = fecha_str_manana[3:5]
+mes_manana = fecha_str_manana[0:2]
+anio_manana = fecha_str_manana[6:]
+
+dia_ayer = fecha_str_ayer[3:5]
+mes_ayer = fecha_str_ayer[0:2]
+anio_ayer = fecha_str_ayer[6:]
+
+df_sol = pd.read_csv('solar_data.csv') 
+
+fecha_para_filtro_ayer = fecha_menos_uno.strftime('%m/%d/%Y')
+fecha_para_filtro_manana = fecha_mas_uno.strftime('%m/%d/%Y')
+
+data_ayer = df_sol['ACTUAL_SYSTEM_WIDE'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_ayer] 
+horas_ayer = df_sol['HOUR_ENDING'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_ayer]
+df_ayer = pd.DataFrame({
+    'Hora' : horas_ayer,
+    'Actual_sol' : data_ayer
+})
+
+df_sol['avg'] = df_sol[['COP_HSL_SYSTEM_WIDE', 'STPPF_SYSTEM_WIDE', 'PVGRPP_SYSTEM_WIDE']].mean(axis = 1) 
+data_manana = df_sol['avg'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_manana]
+horas_manana = df_sol['HOUR_ENDING'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_manana]
+df_manana = pd.DataFrame({
+    'Hora' : horas_manana,
+    'FCST_sol' : data_manana
+})
+
+horas = df_manana['Hora']
+ayer_sol = df_ayer['Actual_sol']
+manana_sol = round(df_manana['FCST_sol'], 2)
+horas.index = [i for i in range(len(horas))]
+ayer_sol.index = [i for i in range(len(ayer_sol))]
+manana_sol.index = [i for i in range(len(manana_sol))]
+
+# WIND
+
+dat_wind = pd.read_csv('wind_data.csv') 
+
+actual_system_wind = dat_wind['ACTUAL_SYSTEM_WIDE'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_ayer]
+cop_system_wide = dat_wind['COP_HSL_SYSTEM_WIDE'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_manana]
+stwfp_system_wide = dat_wind['STWPF_SYSTEM_WIDE'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_manana]
+wgrpp_system_wide = dat_wind['WGRPP_SYSTEM_WIDE'][df_sol['DELIVERY_DATE'] == fecha_para_filtro_manana]
+dat_wind['avg_coastal'] = dat_wind[['COP_HSL_COASTAL', 'STWPF_COASTAL', 'WGRPP_COASTAL']].mean(axis = 1)
+dat_wind['avg_south'] = dat_wind[['COP_HSL_SOUTH', 'STWPF_SOUTH', 'WGRPP_SOUTH']].mean(axis = 1)
+dat_wind['avg_west'] = dat_wind[['COP_HSL_WEST', 'STWPF_WEST', 'WGRPP_WEST']].mean(axis = 1) 
+wind_AVG_FCST_coastal = round(dat_wind['avg_coastal'][dat_wind['DELIVERY_DATE'] == fecha_para_filtro_manana], 2)
+wind_AVG_FCST_south = round(dat_wind['avg_south'][dat_wind['DELIVERY_DATE'] == fecha_para_filtro_manana], 2)
+wind_AVG_FCST_west =  round(dat_wind['avg_west'][dat_wind['DELIVERY_DATE'] == fecha_para_filtro_manana], 2)
+actual_system_wind.index = [i for i in range(len(actual_system_wind))]
+cop_system_wide.index = [i for i in range(len(cop_system_wide))]
+stwfp_system_wide.index = [i for i in range(len(stwfp_system_wide))] 
+wgrpp_system_wide.index = [i for i in range(len(wgrpp_system_wide))]
+wind_AVG_FCST_coastal.index = [i for i in range(len(wind_AVG_FCST_coastal))]
+wind_AVG_FCST_south.index = [i for i in range(len(wind_AVG_FCST_south))]
+wind_AVG_FCST_west.index = [i for i in range(len(wind_AVG_FCST_west))]
+
+# OUTAGES
+
+dat_out = pd.read_csv('outage_data.csv')
+
+dat_out['suma'] = dat_out['TotalResourceMWZoneSouth'] + dat_out['TotalResourceMWZoneWest'] + dat_out['TotalResourceMWZoneHouston']
+Outage_FCST = dat_out['suma'][dat_out['Date'] == fecha_para_filtro_manana]
+Outage_FCST.index = [i for i in range(len(Outage_FCST))]
+
+# Lectura SIN
+
+segundo_str = '00'
+while True:
+    try:
+        nombre_archivo_SIN = f'Cap Transferencia SIN Periodo 20{anio_manana}-{mes_manana}-{dia_manana} al 20{anio2}-{mes2}-{dia2} v20{anio_hoy} {mes_hoy} {dia_hoy}_08 30 {segundo_str}.csv'
+        path_lectura_SIN = f'C:\\Users\\ale_a\\Downloads\\{nombre_archivo_SIN}'
+        dat_SIN_cap = pd.read_csv(path_lectura_SIN, skiprows = 7)
+    except:
+        print(nombre_archivo_SIN)
+        segundo_int = int(segundo_str) + 1
+        segundo_str = f'0{segundo_int}'
+    else:
+        break
+
+#Lectura BCA
+
+segundo_str = '00'
+while True:
+    try:
+        nombre_archivo_BCA = f'Cap Transferencia BCA Periodo 20{anio_manana}-{mes_manana}-{dia_manana} al 20{anio2}-{mes2}-{dia2} v20{anio_hoy} {mes_hoy} {dia_hoy}_08 55 {segundo_str}.csv'
+        path_lectura_BCA = f'C:\\Users\\ale_a\\Downloads\\{nombre_archivo_BCA}'
+        dat_BCA_cap = pd.read_csv(path_lectura_BCA, skiprows = 8)
+    except:
+        print(nombre_archivo_BCA)
+        segundo_int = int(segundo_str) + 1
+        segundo_str = f'0{segundo_int}'
+    else:
+        break
+
+
+# LECTURA DyE (probamos para diferentes segundos)
+segundo_str = '00'
+while True:
+    try:
+        nombre_archivo_EyD = f'Estimacion de Deficit y Excedente BCA Dia 20{anio_manana}-{mes_manana}-{dia_manana} v20{anio_ayer} {mes_ayer} {dia_ayer}_20 00 {segundo_str}.csv'
+        path_lectura_EyD = f'C:\\Users\\ale_a\\Downloads\\{nombre_archivo_EyD}'
+        dat_DyE = pd.read_csv(path_lectura_EyD, skiprows = 8)
+    except:
+        #print(nombre_archivo_EyD)
+        segundo_int = int(segundo_str) + 1
+        segundo_str = f'0{segundo_int}'
+    else:
+        break
+
+
+# Los renglones van a depender del enlace que estemos tomando: LA ROSITA - IMPERIAL VALLEY
+cap_imp = dat_BCA_cap[' Capacidad de Transferencia Disponible para Importacion Comercial (MWh)'][0:24] # Capacidad de Transferencia Disponible para Importacion Comercial (MWh)
+cap_exp = dat_BCA_cap[' Capacidad de Transferencia Disponible para Exportacion Comercial (MWh)'][0:24]
+actual_imp_exp = dat_BCA_cap.iloc[0][1]
+
+dat_def = dat_DyE.iloc[0:24, :]
+dat_def.index = [i for i in range(len(dat_def))]
+deficit = dat_def.iloc[:, 3]
+dat_exc = dat_DyE.iloc[24:48, :]
+dat_exc.index = [i for i in range(len(dat_exc))]
+excedente = dat_exc.iloc[:, 3]
+
+# API Cantidades Asignadas:
+anio = fecha_str_hoy[6:]
+mes = fecha_str_hoy[0:2]
+dia = fecha_str_hoy[3:5]
+proceso = "MDA"
+sistema = "SIN"
+sistema2 = "BCA" 
+fecha_ini = f'20{anio}/{mes}/{dia}'
+url = f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/{sistema}/{proceso}/{fecha_ini}/{fecha_ini}/JSON'
+
+res = requests.get(url)
+print(res.status_code)
+res_dict = json.loads(res.content)
+resultados = res_dict['Resultados']
+resultados_api = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+
+url2 = f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/{sistema2}/{proceso}/{fecha_ini}/{fecha_ini}/JSON'
+res = requests.get(url2)
+print(res.status_code)
+res_dict = json.loads(res.content)
+resultados = res_dict['Resultados']
+resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+
+df_LAA_DCL_MDA = resultados_api[0]
+df_RRD_DCR_MDA = resultados_api[1]
+df_IVY_ROA_MDA = resultados_api2[0]
+df_OMS_TJI_MDA = resultados_api2[1]
+
+# API BANXICO
+res_tc = requests.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43786/datos/oportuno?token=32817a9ed59f9066bd6e37e3825bdbfedfdf1cc700a8c8a703f2db9ba98b933d")
+res_dict = json.loads(res_tc.content)
+resultados = res_dict['bmx']['series']
+resultados_api_banxico = [pd.DataFrame.from_dict(resultados[i]['datos']) for i in range(len(resultados))] 
+tipo_de_cambio = pd.to_numeric(resultados_api_banxico[0].iloc[0, 1]) 
+
+dat_roa_da = pd.read_csv("forecastCaisAhdROA230_2_N101.csv", skiprows = 1)
+load_roa_da = dat_roa_da.iloc[0:24, :] 
+price_roa_da = dat_roa_da.iloc[26:50, :]
+price_roa_da.index = [i for i in range(len(price_roa_da))]
+actual_date_roa = price_roa_da.iloc[0:24, 2].name
+
+dat_ivy_da = pd.read_csv("forecastMexicoAhd07IVY-230.csv", skiprows = 1)
+load_ivy_da = dat_ivy_da.iloc[0:24, :]
+price_ivy_da = dat_ivy_da.iloc[26:50, :]
+price_ivy_da.index = [i for i in range(len(price_ivy_da))]
+actual_date_IVY = price_ivy_da.iloc[0:24, 2].name
+
+dat_roa_rt = pd.read_csv("forecastCaisRtROA230_2_N101.csv", skiprows = 1)
+load_roa_rt = dat_roa_rt.iloc[0:24, :]
+price_roa_rt = dat_roa_rt.iloc[26:50, :]
+price_roa_rt.index = [i for i in range(len(price_roa_rt))]
+#similar_day_roa_rt = dat_roa_rt[c(54:59),c(1:9)]
+
+# Calcular Spreads
+#IMPO-DA
+sp_imp_1 = (pd.to_numeric(price_ivy_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_roa_da.iloc[0:24,3]))
+sp_imp_1[sp_imp_1 < 0] = 0
+
+#IMPO-RT
+sp_imp_2 = (pd.to_numeric(price_ivy_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_roa_rt.iloc[0:24, 3]))
+sp_imp_2[sp_imp_2 < 0] = 0
+
+#EXPO-DA
+sp_exp_1 = (pd.to_numeric(price_roa_da.iloc[0:24, 3])) - (pd.to_numeric(price_ivy_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_1[sp_exp_1 < 0] = 0
+
+#EXPO-RT
+sp_exp_2 = (pd.to_numeric(price_roa_rt.iloc[0:24, 3])) - (pd.to_numeric(price_ivy_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_2[sp_exp_2 < 0] = 0
+
+dat_temp_roa = pd.read_csv("forecastCaisAhdROA230_2_N101_Load.csv", skiprows = 1)
+temp_roa = pd.Series(np.int64(pytemperature.f2c(pd.to_numeric(dat_temp_roa.iloc[26:50, 3]))))
+temp_roa.index = [i for i in range(len(temp_roa))]
+dat_temp_ivy = pd.read_csv("forecastMexicoAhd07IVY-230_Load.csv", skiprows = 1)
+temp_ivy = pd.to_numeric(dat_temp_ivy.iloc[26:50, 3])
+temp_ivy.index = [i for i in range(len(temp_ivy))]
+
+vect1 = pd.Series(len(temp_ivy), dtype = np.float64)
+vect1[0] = tipo_de_cambio
+vect2 = pd.Series(len(temp_ivy))
+vect2[0] = actual_date_roa
+vect3 = pd.Series(len(temp_ivy))
+vect3[0] = actual_date_IVY
+vect4 = pd.Series(len(temp_ivy))
+vect4[0] = actual_imp_exp
+
+df = pd.DataFrame({
+    'ROA_load_fcst' : load_roa_da.iloc[0:24, 3],
+    'ROA_temp_fcst' : temp_roa,
+    'IVY_temp_fcst' : temp_ivy,
+    'Excedente' : excedente, 
+    'Deficit' : deficit,
+    'ROA_act_DA' : price_roa_da.iloc[0:24, 2], 
+    'ROA_act_RT' : price_roa_rt.iloc[0:24, 2],
+    'IVY_act_DA_MXN' : price_ivy_da.iloc[0:24, 2],
+    'IVY_act_DA_USD' : round(pd.to_numeric(price_ivy_da.iloc[0:24, 2])*(1/tipo_de_cambio), 2),
+    'ROA_fcst_DA' : price_roa_da.iloc[0:24, 3], 
+    'ROA_fcst_RT' : price_roa_rt.iloc[0:24, 3],
+    'IVY_fcst_DA_MXN' : price_ivy_da.iloc[0:24, 3],
+    'IVY_fcst_DA_USD' : round(pd.to_numeric(price_ivy_da.iloc[0:24, 3])*(1/tipo_de_cambio), 2),
+    'Spread_IMPO_DA' : round(sp_imp_1, 2),
+    'Spread_IMPO_RT' : round(sp_imp_2, 2),
+    'Spread_EXPO_DA' : round(sp_exp_1, 2),
+    'Spread_EXPO_RT' : round(sp_exp_2, 2),
+    'Impo_asignada_MDA' : df_IVY_ROA_MDA['imp_comer_asig'],
+    'Expo_asignada_MDA' : df_IVY_ROA_MDA['exp_comer_asig'],
+    'Capacidad_impo' : cap_imp,
+    'Capacidad_expo' : cap_exp,
+    'Actual_date_ROA' : vect2,
+    'Actual_date_IVY' : vect3,
+    'Date_capacidades' : vect4,
+    'Exchange_rate' : vect1
+})
+
+df.index = [i + 1 for i in range(len(temp_ivy))] # para que los indices representen las horas (1-24)
+nombre_archivo_IVY_ROA = f'IVY-ROA_{dia_hoy}_{mes_hoy}_{anio_hoy}.csv'
+path_exp = f'C:\\Users\\ale_a\\Documents\\XTS\\APP\\Data\\{nombre_archivo_IVY_ROA}'
+pd.DataFrame.to_csv(df, path_exp)
+
+# TJI - OMS: TIJUANA - OTAY MESA
+
+cap_imp = dat_BCA_cap[' Capacidad de Transferencia Disponible para Importacion Comercial (MWh)'][24:48] #  Capacidad de Transferencia Disponible para Importacion Comercial (MWh)
+cap_exp = dat_BCA_cap[' Capacidad de Transferencia Disponible para Exportacion Comercial (MWh)'][24:48]
+actual_imp_exp = dat_BCA_cap.iloc[24][1]
+cap_imp.index = [i for i in range(len(cap_imp))]
+cap_exp.index = [i for i in range(len(cap_exp))]
+
+dat_tji_da = pd.read_csv("forecastCaisAhdTJI230_2_N101.csv", skiprows = 1)
+load_tji_da = dat_tji_da.iloc[0:24, :] 
+price_tji_da = dat_tji_da.iloc[26:50, :]
+price_tji_da.index = [i for i in range(len(price_roa_da))]
+actual_date_tji = price_tji_da.iloc[0:24, 2].name
+
+dat_oms_da = pd.read_csv("forecastMexicoAhd07OMS-230.csv", skiprows = 1)
+load_oms_da = dat_oms_da.iloc[0:24, :]
+price_oms_da = dat_oms_da.iloc[26:50, :]
+price_oms_da.index = [i for i in range(len(price_oms_da))]
+actual_date_oms = price_oms_da.iloc[0:24, 2].name
+
+dat_tji_rt = pd.read_csv("forecastCaisRtTJI230_2_N101.csv", skiprows = 1)
+load_tji_rt = dat_tji_rt.iloc[0:24, :]
+price_tji_rt = dat_tji_rt.iloc[26:50, :]
+price_tji_rt.index = [i for i in range(len(price_tji_rt))]
+#similar_day_roa_rt = dat_roa_rt[c(54:59),c(1:9)]
+
+# Calcular Spreads
+#IMPO-DA
+sp_imp_1 = (pd.to_numeric(price_oms_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_tji_da.iloc[0:24,3]))
+sp_imp_1[sp_imp_1 < 0] = 0
+
+#IMPO-RT
+sp_imp_2 = (pd.to_numeric(price_oms_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_tji_rt.iloc[0:24, 3]))
+sp_imp_2[sp_imp_2 < 0] = 0
+
+#EXPO-DA
+sp_exp_1 = (pd.to_numeric(price_tji_da.iloc[0:24, 3])) - (pd.to_numeric(price_oms_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_1[sp_exp_1 < 0] = 0
+
+#EXPO-RT
+sp_exp_2 = (pd.to_numeric(price_tji_rt.iloc[0:24, 3])) - (pd.to_numeric(price_oms_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_2[sp_exp_2 < 0] = 0
+
+dat_temp_tji = pd.read_csv("forecastCaisAhdTJI230_2_N101_Load.csv", skiprows = 1)
+temp_tji = pd.Series(np.int64(pytemperature.f2c(pd.to_numeric(dat_temp_tji.iloc[26:50, 3]))))
+temp_tji.index = [i for i in range(len(temp_tji))]
+dat_temp_oms = pd.read_csv("forecastMexicoAhd07OMS-230_Load.csv", skiprows = 1)
+temp_oms = pd.to_numeric(dat_temp_ivy.iloc[26:50, 3])
+temp_oms.index = [i for i in range(len(temp_oms))]
+
+vect1 = pd.Series(len(temp_oms), dtype = np.float64)
+vect1[0] = tipo_de_cambio
+vect2 = pd.Series(len(temp_oms))
+vect2[0] = actual_date_tji
+vect3 = pd.Series(len(temp_oms))
+vect3[0] = actual_date_oms
+vect4 = pd.Series(len(temp_oms))
+vect4[0] = actual_imp_exp
+
+df2 = pd.DataFrame({
+    'TJI_load_fcst' : load_tji_da.iloc[0:24, 3],
+    'TJI_temp_fcst' : temp_tji,
+    'OMS_temp_fcst' : temp_oms,
+    'Excedente' : excedente, 
+    'Deficit' : deficit,
+    'TJI_act_DA' : price_tji_da.iloc[0:24, 2], 
+    'TJI_act_RT' : price_tji_rt.iloc[0:24, 2],
+    'OMS_act_DA_MXN' : price_oms_da.iloc[0:24, 2],
+    'OMS_act_DA_USD' : round(pd.to_numeric(price_oms_da.iloc[0:24, 2])*(1/tipo_de_cambio), 2),
+    'TJI_fcst_DA' : price_tji_da.iloc[0:24, 3], 
+    'TJI_fcst_RT' : price_tji_rt.iloc[0:24, 3],
+    'OMS_fcst_DA_MXN' : price_oms_da.iloc[0:24, 3],
+    'OMS_fcst_DA_USD' : round(pd.to_numeric(price_oms_da.iloc[0:24, 3])*(1/tipo_de_cambio), 2),
+    #spreads:
+    'Spread_IMPO_DA' : round(sp_imp_1, 2),
+    'Spread_IMPO_RT' : round(sp_imp_2, 2),
+    'Spread_EXPO_DA' : round(sp_exp_1, 2),
+    'Spread_EXPO_RT' : round(sp_exp_2, 2),
+    'Impo_asignada_MDA' : df_OMS_TJI_MDA['imp_comer_asig'],
+    #Importacion_asignada_MTR = df_IVY_ROA_MTR$imp_comer_asig,
+    'Expo_asignada_MDA' : df_OMS_TJI_MDA['exp_comer_asig'],
+    'Capacidad_impo' : cap_imp,
+    'Capacidad_expo' : cap_exp,
+    #Exportacion_asignada_MTR = df_IVY_ROA_MTR$exp_comer_asig,
+    'Actual_date_TJI' : vect2,
+    'Actual_date_OMS' : vect3,
+    'Date_capacidades' : vect4,
+    'Exchange_rate' : vect1
+    # .fillna()
+})
+
+df2.index = [i + 1 for i in range(len(temp_tji))] # para que los indices representen las horas (1-24)
+
+nombre_archivo_TJI_OMS = f'OMS-TJI_{dia_hoy}_{mes_hoy}_{anio_hoy}.csv'
+path_exp = f'C:\\Users\\ale_a\\Documents\\XTS\\APP\\Data\\{nombre_archivo_TJI_OMS}'
+pd.DataFrame.to_csv(df2, path_exp)
+
+
+# LAA - DCL :  - 
+
+cap_imp = dat_SIN_cap[' Capacidad de Transferencia Disponible para Importacion Comercial (MWh)'][0:24] 
+cap_exp = dat_SIN_cap[' Capacidad de Transferencia Disponible para Exportacion Comercial (MWh)'][0:24]
+actual_imp_exp = dat_SIN_cap.iloc[0][1]
+cap_imp.index = [i for i in range(len(cap_imp))]
+cap_exp.index = [i for i in range(len(cap_exp))]
+
+dat_dcl_da = pd.read_csv("forecastErcotAhdDCL.csv", skiprows = 1)
+load_dcl_da = dat_dcl_da.iloc[0:24, :] 
+price_dcl_da = dat_dcl_da.iloc[26:50, :]
+price_dcl_da.index = [i for i in range(len(price_dcl_da))]
+actual_date_dcl = price_dcl_da.iloc[0:24, 2].name
+
+dat_laa_da = pd.read_csv("forecastMexicoAhd06LAA-138.csv", skiprows = 1)
+load_laa_da = dat_laa_da.iloc[0:24, :]
+price_laa_da = dat_laa_da.iloc[26:50, :]
+price_laa_da.index = [i for i in range(len(price_laa_da))]
+actual_date_laa = price_laa_da.iloc[0:24, 2].name
+
+dat_dcl_rt = pd.read_csv("forecastErcotRtDCL.csv", skiprows = 1)
+load_dcl_rt = dat_dcl_rt.iloc[0:24, :]
+price_dcl_rt = dat_dcl_rt.iloc[26:50, :]
+price_dcl_rt.index = [i for i in range(len(price_dcl_rt))]
+
+#IMPO-DA
+sp_imp_1 = (pd.to_numeric(price_laa_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_dcl_da.iloc[0:24,3]))
+sp_imp_1[sp_imp_1 < 0] = 0
+
+#IMPO-RT
+sp_imp_2 = (pd.to_numeric(price_laa_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_dcl_rt.iloc[0:24, 3]))
+sp_imp_2[sp_imp_2 < 0] = 0
+
+#EXPO-DA
+sp_exp_1 = (pd.to_numeric(price_dcl_da.iloc[0:24, 3])) - (pd.to_numeric(price_laa_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_1[sp_exp_1 < 0] = 0
+
+#EXPO-RT
+sp_exp_2 = (pd.to_numeric(price_dcl_rt.iloc[0:24, 3])) - (pd.to_numeric(price_laa_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_2[sp_exp_2 < 0] = 0
+
+dat_temp_dcl = pd.read_csv("forecastErcotAhdDCL_Load.csv", skiprows = 1)
+temp_dcl = pd.Series(np.int64(pytemperature.f2c(pd.to_numeric(dat_temp_dcl.iloc[26:50, 3]))))
+temp_dcl.index = [i for i in range(len(temp_dcl))]
+dat_temp_laa = pd.read_csv("forecastMexicoAhd06LAA-138_Load.csv", skiprows = 1)
+temp_laa = pd.to_numeric(dat_temp_laa.iloc[26:50, 3])
+temp_laa.index = [i for i in range(len(temp_laa))]
+
+vect1 = pd.Series(len(temp_laa), dtype = np.float64)
+vect1[0] = tipo_de_cambio
+vect2 = pd.Series(len(temp_dcl))
+vect2[0] = actual_date_dcl
+vect3 = pd.Series(len(temp_laa))
+vect3[0] = actual_date_laa
+vect4 = pd.Series(len(temp_laa))
+vect4[0] = actual_imp_exp
+
+# Agregue forecasts y actuals de sol (falta wind)
+
+df3 = pd.DataFrame({
+    'FCST_Outages' : Outage_FCST,
+    'DCL_load_fcst' : load_dcl_da.iloc[0:24, 3],
+    'DCL_temp_fcst' : temp_dcl,
+    'LAA_temp_fcst' : temp_laa,
+    'DCL_act_DA' : price_dcl_da.iloc[0:24, 2], 
+    'DCL_act_RT' : price_dcl_rt.iloc[0:24, 2],
+    'LAA_act_DA_MXN' : price_laa_da.iloc[0:24, 2],
+    'LAA_act_DA_USD' : round(pd.to_numeric(price_laa_da.iloc[0:24, 2])*(1/tipo_de_cambio), 2),
+    'DCL_fcst_DA' : price_dcl_da.iloc[0:24, 3], 
+    'DCL_fcst_RT' : price_dcl_rt.iloc[0:24, 3],
+    'LAA_fcst_DA_MXN' : price_laa_da.iloc[0:24, 3],
+    'LAA_fcst_DA_USD' : round(pd.to_numeric(price_laa_da.iloc[0:24, 3])*(1/tipo_de_cambio), 2),
+    #spreads:
+    'Spread_IMPO_DA' : round(sp_imp_1, 2),
+    'Spread_IMPO_RT' : round(sp_imp_2, 2),
+    'Spread_EXPO_DA' : round(sp_exp_1, 2),
+    'Spread_EXPO_RT' : round(sp_exp_2, 2),
+    'Impo_asignada_MDA' : df_LAA_DCL_MDA['imp_comer_asig'],
+    #Importacion_asignada_MTR = df_IVY_ROA_MTR$imp_comer_asig,
+    'Expo_asignada_MDA' : df_LAA_DCL_MDA['exp_comer_asig'],
+    'Capacidad_impo' : cap_imp,
+    'Capacidad_expo' : cap_exp,
+    #Exportacion_asignada_MTR = df_IVY_ROA_MTR$exp_comer_asig,
+    'Actual_date_DCL' : vect2,
+    'Actual_date_LAA' : vect3,
+    'Date_capacidades' : vect4,
+    'Exchange_rate' : vect1,
+    'SW_actual_sun' : ayer_sol,
+    'SW_sun_fcst' : manana_sol,
+    'Actual_wind' : actual_system_wind,
+    'WIND_COP_SW_FCST' : cop_system_wide,
+    'WIND_STWFP_SW_FCST' : stwfp_system_wide,
+    'WIND_WGRPP_SW_FCST' : wgrpp_system_wide,
+    'Wind_AVG_FCST_coastal' : wind_AVG_FCST_coastal,
+    'Wind_AVG_FCST_south' : wind_AVG_FCST_south,
+    'Wind_AVG_FCST_west' : wind_AVG_FCST_west
+    # .fillna()
+})
+
+df3.index = [i + 1 for i in range(len(temp_dcl))] # para que los indices representen las horas (1-24)
+ 
+# Exportar a csv
+nombre_archivo_LAA_DCL = f'LAA-DCL_{dia_hoy}_{mes_hoy}_{anio_hoy}.csv'
+path_exp = f'C:\\Users\\ale_a\\Documents\\XTS\\APP\\Data\\{nombre_archivo_LAA_DCL}'
+pd.DataFrame.to_csv(df3, path_exp)
+
+
+# RRD - DCR
+
+cap_imp = dat_SIN_cap[' Capacidad de Transferencia Disponible para Importacion Comercial (MWh)'][24:48] 
+cap_exp = dat_SIN_cap[' Capacidad de Transferencia Disponible para Exportacion Comercial (MWh)'][24:48]
+actual_imp_exp = dat_SIN_cap.iloc[24][1]
+cap_imp.index = [i for i in range(len(cap_imp))]
+cap_exp.index = [i for i in range(len(cap_exp))]
+
+dat_dcr_da = pd.read_csv("forecastErcotAhdDCR.csv", skiprows = 1)
+load_dcr_da = dat_dcr_da.iloc[0:24, :] 
+price_dcr_da = dat_dcr_da.iloc[26:50, :]
+price_dcr_da.index = [i for i in range(len(price_dcr_da))]
+actual_date_dcr = price_dcr_da.iloc[0:24, 2].name
+
+dat_rrd_da = pd.read_csv("forecastMexicoAhd06RRD-138.csv", skiprows = 1)
+load_rrd_da = dat_rrd_da.iloc[0:24, :]
+price_rrd_da = dat_rrd_da.iloc[26:50, :]
+price_rrd_da.index = [i for i in range(len(price_rrd_da))]
+actual_date_rrd = price_rrd_da.iloc[0:24, 2].name
+
+dat_dcr_rt = pd.read_csv("forecastErcotRtDCR.csv", skiprows = 1)
+load_dcr_rt = dat_dcr_rt.iloc[0:24, :]
+price_dcr_rt = dat_dcr_rt.iloc[26:50, :]
+price_dcr_rt.index = [i for i in range(len(price_dcr_rt))]
+
+#IMPO-DA
+sp_imp_1 = (pd.to_numeric(price_rrd_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_dcr_da.iloc[0:24,3]))
+sp_imp_1[sp_imp_1 < 0] = 0
+
+#IMPO-RT
+sp_imp_2 = (pd.to_numeric(price_rrd_da.iloc[0:24, 3])*(1/tipo_de_cambio)) - (pd.to_numeric(price_dcr_rt.iloc[0:24, 3]))
+sp_imp_2[sp_imp_2 < 0] = 0
+
+#EXPO-DA
+sp_exp_1 = (pd.to_numeric(price_dcr_da.iloc[0:24, 3])) - (pd.to_numeric(price_rrd_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_1[sp_exp_1 < 0] = 0
+
+#EXPO-RT
+sp_exp_2 = (pd.to_numeric(price_dcr_rt.iloc[0:24, 3])) - (pd.to_numeric(price_rrd_da.iloc[0:24, 3])*(1/tipo_de_cambio))
+sp_exp_2[sp_exp_2 < 0] = 0
+
+dat_temp_dcr = pd.read_csv("forecastErcotAhdDCR_Load.csv", skiprows = 1)
+temp_dcr = pd.Series(np.int64(pytemperature.f2c(pd.to_numeric(dat_temp_dcr.iloc[26:50, 3]))))
+temp_dcr.index = [i for i in range(len(temp_dcr))]
+dat_temp_rrd = pd.read_csv("forecastMexicoAhd06RRD-138_Load.csv", skiprows = 1)
+temp_rrd = pd.to_numeric(dat_temp_rrd.iloc[26:50, 3])
+temp_rrd.index = [i for i in range(len(temp_rrd))]
+
+vect1 = pd.Series(len(temp_rrd), dtype = np.float64)
+vect1[0] = tipo_de_cambio
+vect2 = pd.Series(len(temp_dcr))
+vect2[0] = actual_date_dcr
+vect3 = pd.Series(len(temp_rrd))
+vect3[0] = actual_date_rrd
+vect4 = pd.Series(len(temp_rrd))
+vect4[0] = actual_imp_exp
+
+df4 = pd.DataFrame({
+    'FCST_Outages' : Outage_FCST,
+    'DCR_load_fcst' : load_dcr_da.iloc[0:24, 3],
+    'DCR_temp_fcst' : temp_dcr,
+    'RRD_temp_fcst' : temp_rrd,
+    'DCR_act_DA' : price_dcr_da.iloc[0:24, 2], 
+    'DCR_act_RT' : price_dcr_rt.iloc[0:24, 2],
+    'RRD_act_DA_MXN' : price_rrd_da.iloc[0:24, 2],
+    'RRD_act_DA_USD' : round(pd.to_numeric(price_rrd_da.iloc[0:24, 2])*(1/tipo_de_cambio), 2),
+    'DCR_fcst_DA' : price_dcr_da.iloc[0:24, 3], 
+    'DCR_fcst_RT' : price_dcr_rt.iloc[0:24, 3],
+    'RRD_fcst_DA_MXN' : price_rrd_da.iloc[0:24, 3],
+    'RRD_fcst_DA_USD' : round(pd.to_numeric(price_rrd_da.iloc[0:24, 3])*(1/tipo_de_cambio), 2),
+    #spreads:
+    'Spread_IMPO_DA' : round(sp_imp_1, 2),
+    'Spread_IMPO_RT' : round(sp_imp_2, 2),
+    'Spread_EXPO_DA' : round(sp_exp_1, 2),
+    'Spread_EXPO_RT' : round(sp_exp_2, 2),
+    'Impo_asignada_MDA' : df_RRD_DCR_MDA['imp_comer_asig'],
+    #Importacion_asignada_MTR = df_IVY_ROA_MTR$imp_comer_asig,
+    'Expo_asignada_MDA' : df_RRD_DCR_MDA['exp_comer_asig'],
+    'Capacidad_impo' : cap_imp,
+    'Capacidad_expo' : cap_exp,
+    #Exportacion_asignada_MTR = df_IVY_ROA_MTR$exp_comer_asig,
+    'Actual_date_DCR' : vect2,
+    'Actual_date_RRD' : vect3,
+    'Date_capacidades' : vect4,
+    'Exchange_rate' : vect1,
+    'DCR_actual_sun' : ayer_sol,
+    'DCR_sun_fcst' : manana_sol,
+    'Actual_wind' : actual_system_wind,
+    'WIND_COP_SW_FCST' : cop_system_wide,
+    'WIND_STWFP_SW_FCST' : stwfp_system_wide,
+    'WIND_WGRPP_SW_FCST' : wgrpp_system_wide,
+    'Wind_AVG_FCST_coastal' : wind_AVG_FCST_coastal,
+    'Wind_AVG_FCST_south' : wind_AVG_FCST_south,
+    'Wind_AVG_FCST_west' : wind_AVG_FCST_west
+    # .fillna()
+})
+
+df4.index = [i + 1 for i in range(len(temp_dcr))] # para que los indices representen las horas (1-24)
+
+# Exportar a csv
+nombre_archivo_RRD_DCR = f'RRD-DCR_{dia_hoy}_{mes_hoy}_{anio_hoy}.csv'
+path_exp = f'C:\\Users\\ale_a\\Documents\\XTS\\APP\\Data\\{nombre_archivo_RRD_DCR}'
+pd.DataFrame.to_csv(df4, path_exp)
+
+fecha2 = datetime.datetime.now()
+cambio_tiempo = fecha2 - tiempo_inicio 
+
+print(f'Tiempo: {cambio_tiempo}')
+

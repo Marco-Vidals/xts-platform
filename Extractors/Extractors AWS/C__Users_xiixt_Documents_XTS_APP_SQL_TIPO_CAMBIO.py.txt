@@ -1,0 +1,71 @@
+     # -*- coding: utf-8 -*-
+def tipo_cambio_SQL(bd,serv,usuario,password,crear_tabla):
+    import pyodbc
+    import requests 
+    import json 
+    import pandas as pd
+    import datetime
+    from datetime import timedelta
+    import numpy as np
+    def conexion_SQL():
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+
+
+
+    # API BANXICO
+    try:
+        res_tc = requests.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF60653/datos/oportuno?token=44a87bef665b6d7777a5dce5fe45a4cd39a4d2661e6e507b36ddf8fb0dc11aa2")
+        res_dict = json.loads(res_tc.content)
+        resultados = res_dict['bmx']['series']
+        resultados_api_banxico = [pd.DataFrame.from_dict(resultados[i]['datos']) for i in range(len(resultados))] 
+        tipo_de_cambio = pd.to_numeric(resultados_api_banxico[0].iloc[0, 1]) 
+    except:
+        print("Revisar API Banxico")
+        tipo_de_cambio=pd.DataFrame(np.zeros((24, 2)))
+    ##Fecha
+    b=datetime.datetime.today()-timedelta(days=0)
+    ##b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.replace(hour=0,minute=0,second=0,microsecond=0)
+    c=[0 for i in range(48)]
+    for i in range(48):
+        c[i]=b+datetime.timedelta(hours=i)
+    
+    ##Creamos la conexi├│n
+    a=conexion_SQL()
+    
+    ##La primera vez creamos una tabla
+    if crear_tabla==1:
+        consulta='create table Tipo_Cambio( fecha datetime primary key , TC float )'
+        cursorCreate=a.cursor()
+        cursorCreate.execute(consulta)
+    
+        cursorCreate.commit()
+        cursorCreate.close()
+    
+    ##Actualizamos los datos de hoy, ponemos un forecast para ma├▒ana
+    
+    cursorinsert=a.cursor()
+    consulta='insert into Tipo_Cambio (fecha,TC) values(?,?)'
+    try:
+        for i in range(24):
+            cursorinsert.execute(consulta,c[24+i],tipo_de_cambio)
+        cursorinsert.commit()
+        cursorinsert.close()
+    except:
+        print("Datos existentes")
+    
+    cursorupdate=a.cursor()
+    consulta='update Tipo_Cambio set TC=? where fecha=?'
+    
+    for i in range(24):
+        cursorupdate.execute(consulta,tipo_de_cambio,c[i])
+    cursorupdate.commit()
+    cursorupdate.close()
+    
+    a.close()

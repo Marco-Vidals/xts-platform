@@ -1,0 +1,408 @@
+from selenium import webdriver
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import urllib.request
+import shutil
+import re
+import os
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+import pytemperature
+import pyodbc
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTS_operations.XiiX'
+
+fhoy=datetime.datetime.today()
+hoy=fhoy.strftime('%x')
+dmas1=fhoy+timedelta(days=1)
+fecha=dmas1.strftime('%x')
+dmenos1=fhoy-timedelta(days=1)
+fmenos=dmenos1.strftime('%x')
+dmenos2=fhoy-timedelta(days=2)
+fm2=dmenos2.strftime('%x')
+nextweek=fhoy+timedelta(days=7)
+nxtwk=nextweek.strftime('%x')
+samedayfmm=fhoy-timedelta(days=6)
+sdfmm=samedayfmm.strftime('%x')
+
+#ERCOT
+driver= webdriver.Firefox()#'C:\\Users\\Administrator\\Downloads\\geckodriver\\geckodriver.exe')
+driver.get('https://www.ercot.com/content/cdr/html/CURRENT_DAYCOP_HSL.html')
+time.sleep(random.uniform(4,8))
+deficit=driver.find_element('xpath','/html/body/div/div[2]/div/table/tbody/tr/td[1]/table/tbody/tr/td[2]/a')
+deficit.click()
+descarga=(driver.current_url)
+driver.get(descarga)
+kk='C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\MORNING\\windgraph.png'
+img=driver.find_element('xpath','/html/body/div/div[2]/table/tbody/tr[3]/td/div/div/img')
+src=img.get_attribute('src')
+urllib.request.urlretrieve(src,'C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\MORNING\\windgraph.png')
+time.sleep(random.uniform(3,8))
+driver.close()
+
+try:
+    conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+    print('Conexi├│n exitosa')
+except:
+    print('No funcion├│ la conexi├│n')
+    
+a=conx.cursor()
+    
+def diatable(dia,tabla):
+    dr=dia.replace(hour=0,minute=0,second=0,microsecond=0)
+    d24=dr+timedelta(hours=23)
+    consulta=f"select * from {tabla} where fecha between '{dr}' and '{d24}'"
+    a.execute(consulta)
+    resultado=a.fetchall()
+    return resultado
+
+def columna(lista,col):
+    l=[]
+    try:
+        for i in range(24):
+            df=lista[i][col]
+            l.append(df)
+    except:
+        l=[0 for i in range(24)]
+    return l
+
+today = datetime.date.today()
+
+tc=diatable(dmas1,'Tipo_Cambio')
+#sdlwe
+sdlwe=diatable(samedayfmm, 'DATOS_ERCOT')
+sdlwc=diatable(samedayfmm, 'DATOS_CAISO')
+sdlwren=diatable(samedayfmm, 'RENERGY')
+#dbye
+dbye=diatable(dmenos2,'DATOS_ERCOT')
+dbyc=diatable(dmenos2, 'DATOS_CAISO')
+#AYER
+yenve=diatable(dmenos1,'DATOS_ERCOT')
+yercot=diatable(dmenos1,'ERCOT')
+yenvc=diatable(dmenos1, 'DATOS_CAISO')
+yren=diatable(dmenos1,'RENERGY')
+#HOY
+env=diatable(fhoy,'DATOS_ERCOT')
+ercot=diatable(fhoy,'ERCOT')
+impexp=diatable(fhoy,'IMPEXP')
+temp=diatable(fhoy, 'TEMPERATURAS')
+ren=diatable(fhoy,'RENERGY')
+#MA├æANA
+tenv=diatable(dmas1,'DATOS_ERCOT')
+tercot=diatable(dmas1,'ERCOT')
+ttemp=diatable(dmas1, 'TEMPERATURAS')
+cb=diatable(dmas1, 'CB_ERCOT')
+tren=diatable(dmas1,'RENERGY')
+timpexp=diatable(dmas1,'IMPEXP')
+
+#DATAFRAME ERCOT
+l1=columna(yenve,7)
+l2=columna(env,7)
+l3=columna(tenv,7)
+l4=columna(yenve,8)
+l5=columna(env,8)
+l6=columna(tenv,8)
+l7=columna(ercot,1)
+l8=columna(tercot,1)
+l9=columna(ercot,2)
+l10=columna(tercot,2)
+l11=columna(yercot,3)
+l12=columna(ercot,3)
+l13=columna(tercot,3)
+l14=columna(yercot,4)
+l15=columna(ercot,4)
+l16=columna(tercot,4)
+l17=columna(yercot,5)
+l18=columna(ercot,5)
+l19=columna(tercot,5)
+lw1=columna(yenve,9)
+lw2=columna(env,9)
+lw3=columna(tenv,9)
+l20=columna(temp,6)
+l21=columna(ttemp,6)
+l22=columna(temp,5)
+l23=columna(ttemp,5)
+l24=columna(temp,7)
+l25=columna(ttemp,7)
+l26=columna(temp,8)
+l27=columna(ttemp,8)
+s1=columna(yercot,6)
+s2=columna(ercot,6)
+s3=columna(tercot,6)
+l28=columna(sdlwe,1)
+l29=columna(sdlwe,2)
+l30=columna(yenve,1)
+l31=columna(yenve,2)
+l32=columna(env,1)
+l33=columna(env,2)
+l34=columna(tenv,10)
+l35=columna(tenv,11)
+l36=columna(sdlwe,3)
+l37=columna(sdlwe,4)
+l38=columna(dbye,3)
+l39=columna(dbye, 4)
+l40=columna(yenve,3)
+l41=columna(yenve, 4)
+l42=columna(env,3)
+l43=columna(env,4)
+l44=columna(tenv,12)
+l45=columna(tenv,13)
+l46=columna(sdlwe,5)
+l47=columna(sdlwe,6)
+l48=columna(dbye,5)
+l49=columna(dbye, 6)
+l50=columna(yenve,5)
+l51=columna(yenve, 6)
+l52=columna(env,5)
+l53=columna(env,6)
+l54=columna(tenv,14)
+l55=columna(tenv,15)
+l62=columna(cb,5)
+l63=columna(cb,6)
+l64=columna(cb,11)
+l65=columna(cb,12)
+l66=columna(cb,3)
+l67=columna(cb,4)
+l68=columna(cb,9)
+l69=columna(cb,10)
+l70=columna(cb,1)
+l71=columna(cb,2)
+l72=columna(cb,7)
+l73=columna(cb,8)
+l74=[today for i in range(24)]
+l75=columna(tc,1)
+l76=columna(impexp,1)
+l77=columna(impexp,2)
+l78=columna(impexp,3)
+l79=columna(impexp,4)
+
+pre=pd.DataFrame(zip(l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,\
+                     l16,l17,l18,l19,lw1,lw2,lw3,l20,l21,l22,l23,l24,l25,\
+                     l26,l27,s1,s2,s3,l28,l29,l30,l31,l32,l33,l34,l35,l36,\
+                     l37,l38,l39,l40,l41,l42,l43,l44,l45,l46,l47,l48,l49,\
+                     l50,l51,l52,l53,l54,l55,l62,l63,l64,l65,l66,l67,l68,\
+                     l69,l70,l71,l72,l73,l74,l75,l76,l77,l78,l79),columns=['Mx Load yst',\
+                    'Mx Load tdy','Mx Load fcst','Ercot Load yst','Ercot Load tdy',\
+                    'Ercot Load fcst','Outages South tdy','Outages South fcst',\
+                    'Outages H tdy','Outages H fcst','wind South yst','wind South tdy',\
+                    'wind South fcst','wind West yst','wind West tdy','wind West fcst',\
+                    'wind North yst','wind North tdy','wind North fcst','Wind Env yst',\
+                    'Wind Env tdy',	'Wind Env fcst','Temp Laredo tdy','Temp Laredo nxt',\
+                    'Temp N Laredo tdy','Temp N Laredo nxt','Temp Reynosa tdy',\
+                    'Temp Reynosa nxt','Temp McAllen tdy','Temp McAllen nxt',\
+                    'Solar yst','Solar tdy','Solar nxt','LAA sdlw','RRD sdlw',\
+                    'LAA YST','RRD YST','LAA TDY','RRD TDY','LAA NXT','RRD NXT',\
+                    'DA DCL sdlw','DA DCR sdlw','DA DCL dby','DA DCR dby',\
+                    'DA DCL YST','DA DCR YST','DA DCL TDY','DA DCR TDY',\
+                    'DA DCL NXT','DA DCR NXT','RT DCL sdlw','RT DCR sdlw',\
+                    'RT DCL dby','RT DCR dby','RT DCL YST','RT DCR YST','RT DCL TDY',\
+                    'RT DCR TDY','RT DCL NXT','RT DCR NXT','CB DA DCL P','CB DA DCL U',\
+                    'CB DA DCR P','CB DA DCR U','CB Rt DCL P','CB Rt DCL U',\
+                    'CB Rt DCR P','CB Rt DCR U','CB LAA P','CB LAA U','CB RRD P',\
+                    'CB RRD U','Hoy','Tipo de cambio','IMPO-ASIGNADA-LAA-MDA (M)',\
+                    'EXPO-ASIGNADA-LAA-MDA (M)','IMPO-ASIGNADA-RRD-MDA (M)',\
+                    'EXPO-ASIGNADA-RRD-MDA (M)'])
+
+wb = xw.Book('C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\MORNING\\A_PRE_MORNINGS_ERCOT_830_910.xlsx')
+sht1 = wb.sheets['Pre_Data']
+sht1.range('A1').value=pre
+time.sleep(10)
+wb.app.quit()
+time.sleep(3)
+print('premorning Ercot')
+
+#CAISO
+
+driver= webdriver.Firefox()
+driver.get('https://www.cenace.gob.mx/Paginas/SIM/Reportes/EstimacionDeficExcEnergia.aspx')
+time.sleep(random.uniform(5,10))
+deficit=driver.find_element('xpath','//input[@id="ctl00_ContentPlaceHolder1_GridRadEDefiExc_ctl00_ctl04_gbccolumn"]')
+deficit.click()
+time.sleep(3)
+driver.close()
+# LECTURA DyE 
+segundo_str = '00'
+for i in range(65):
+    try:
+        nombre_archivo_EyD = f'Estimacion de Deficit y Excedente BCA Dia 20{fecha[6:8]}-{fecha[0:2]}-{fecha[3:5]} v20{fmenos[6:8]} {fmenos[0:2]} {fmenos[3:5]}_20 00 {segundo_str}.csv'
+        path_lectura_EyD = f'C:\\Users\\Administrator\\Downloads\\{nombre_archivo_EyD}'
+        newcap=os.path.join('C:\\Users\\Administrator\\Downloads\\def-exc.csv')
+        shutil.move(path_lectura_EyD, newcap)
+        dat_DyE=pd.read_csv('C:\\Users\\Administrator\\Downloads\\def-exc.csv',skiprows=9)
+    except:
+        #print(nombre_archivo_EyD)
+        segundo_int = int(segundo_str) + 1
+        segundo_str = ("%02d" % segundo_int)
+        if segundo_str=='60':
+            dat_DyE= pd.DataFrame(np.zeros((50, 4)))
+            break
+    else:
+            break      
+deficit=(dat_DyE.iloc[0:24,3])
+excedente=(dat_DyE.iloc[24:48,3])
+defexc=pd.DataFrame(zip(deficit,excedente),columns=['Deficit','Excedente'])
+ceros=pd.DataFrame(np.zeros((50, 9)))
+
+c=[1 for i in range(24)]
+dt=datetime.datetime.today()
+dt=dt.replace(hour=0,minute=0,second=0,microsecond=0)
+consulta='insert into DEF_EXC (fecha, DEFICIT, EXCEDENTE) values(?,?,?)'
+try:
+    for i in range(24):
+        c[i]=dt+datetime.timedelta(hours=i)
+        a.execute(consulta,c[i],float(defexc.iloc[i,0]),float(defexc.iloc[i,1]))
+except:
+    print("Datos existentes")
+
+#HOY
+env=diatable(fhoy, 'DATOS_CAISO')
+temp=diatable(fhoy, 'TEMPERATURAS')
+impexp=diatable(fhoy, 'IMPEXP')
+#Ma├▒ana
+tenv=diatable(dmas1, 'DATOS_CAISO')
+ttemp=diatable(dmas1, 'TEMPERATURAS')
+cb=diatable(dmas1, 'CB_CAISO')
+
+#DATAFRAME CAISO
+l1=excedente
+l2=deficit
+l3=columna(yenvc, 7)
+l4=columna(env, 7)
+l5=columna(tenv, 7)
+l6=columna(temp, 3)
+l7=columna(ttemp, 3)
+l8=columna(temp, 1)
+l9=columna(ttemp, 1)
+l10=columna(temp, 4)
+l11=columna(ttemp, 4)
+l12=columna(temp, 2)
+l13=columna(ttemp, 2)
+l14=columna(yenvc, 8)
+l15=columna(env, 8)
+l16=columna(tenv, 8)
+l17=columna(yenvc, 9)
+l18=columna(env, 9)
+l19=columna(tenv, 9)
+l20=columna(sdlwc, 1)
+l21=columna(sdlwc, 2)
+l22=columna(yenvc, 1)
+l23=columna(yenvc, 2)
+l24=columna(env, 1)
+l25=columna(env, 2)
+l26=columna(tenv, 10)
+l27=columna(tenv, 11)
+l28=columna(sdlwc, 3)
+l29=columna(sdlwc, 4)
+l30=columna(dbyc,3)
+l31=columna(dbyc,4)
+l32=columna(yenvc, 3)
+l33=columna(yenvc, 4)
+l34=columna(env, 3)
+l35=columna(env, 4)
+l36=columna(tenv, 12)
+l37=columna(tenv, 13)
+l38=columna(sdlwc, 5)
+l39=columna(sdlwc, 6)
+l40=columna(dbyc,5)
+l41=columna(dbyc,6)
+l42=columna(yenvc, 5)
+l43=columna(yenvc, 6)
+l44=columna(env, 5)
+l45=columna(env, 6)
+l46=columna(tenv, 14)
+l47=columna(tenv, 15)
+l48=columna(cb, 1)
+l49=columna(cb, 2)
+l50=columna(cb, 7)
+l51=columna(cb, 8)
+l52=columna(cb, 5)
+l53=columna(cb, 6)
+l54=columna(cb, 11)
+l55=columna(cb, 12)
+l56=columna(cb, 3)
+l57=columna(cb, 4)
+l58=columna(cb, 9)
+l59=columna(cb, 10)
+l60=[today for i in range(24)]
+l61=columna(tc, 1)
+l62=columna(impexp,5)
+l63=columna(impexp,6)
+l64=columna(impexp,7)
+l65=columna(impexp,8)
+l66=columna(yren,1)
+l67=columna(yren,2)
+l68=columna(ren,1)
+l69=columna(ren,2)
+l70=columna(tren,1)
+l71=columna(tren,2)
+l72=columna(sdlwren,1)
+l73=columna(sdlwren,2)
+#EXTRAS RENERGY
+l74=columna(yren,3)
+l75=columna(yren,4)
+l76=columna(yren,5)
+l77=columna(yren,6)
+l78=columna(yren,7)
+l79=columna(ren,3)
+l80=columna(ren,4)
+l81=columna(ren,5)
+l82=columna(ren,6)
+l83=columna(ren,7)
+l84=columna(tren,3)
+l85=columna(tren,4)
+l86=columna(tren,5)
+l87=columna(tren,6)
+l88=columna(tren,7)
+
+
+pre=pd.DataFrame(zip(l1,l2,l3,l4,l5,l6,l7,l8,l9,l10,l11,l12,l13,l14,l15,\
+                     l16,l17,l18,l19,l20,l21,l22,l23,l24,l25,\
+                     l26,l27,l28,l29,l30,l31,l32,l33,l34,l35,l36,\
+                     l37,l38,l39,l40,l41,l42,l43,l44,l45,l46,l47,l48,l49,\
+                     l50,l51,l52,l53,l54,l55,l56,l57,l58,l59,l60,l61,l62,l63,l64,l65,\
+                     l66,l67,l68,l69,l70,l71,l72,l73,l74,l75,l76,l77,l78,l79,\
+                     l80,l81,l82,l83,l84,l85,l86,l87,l88),\
+                     columns=['Excedente',\
+                     'Deficit',	'MEX LOAD YST',	'MEX LOAD TDY','MEX LOAD FCST',\
+                     'Mexicali Temp tdy','Mexicali Temp fcst','TJI Temp tdy',\
+                     'TJI Temp fcst','IVY Temp tdy','IVY Temp fcst','Sn Diego Temp tdy',\
+                     'Sn Diego fcst','Caiso load yst','Caiso load tdy',	\
+                     'Caiso load fcst','Solar yst','Solar tdy',	'Solar fcst',\
+                     'IVY SDLW','OMS SDLW','IVY YTD','OMS YTD','IVY TDY','OMS TDY',\
+                     'IVY FCST','OMS FCST','DA ROA SDLW','DA TJI SDLW','DA ROA DBY',\
+                     'DA TJI DBY','DA ROA YST','DA TJI YST','DA ROA TDY','DA TJI TDY',\
+                     'DA ROA FCST','DA TJI FCST','FMM ROA SDLW','FMM TJI SDLW',\
+                     'FMM ROA DBY','FMM TJI DBY','FMM ROA YST','FMM TJI YST',\
+                     'FMM ROA TDY','FMM TJI TDY','FMM ROA FCST','FMM TJI FCST',\
+                     'CB IVY P','CB IVY U','CB OMS P','CB OMS U','CB DA ROA P',\
+                     'CB DA ROA U','CB DA TJI P','CB DA TJI U','CB FMM ROA P',\
+                     'CB FMM ROA U','CB FMM TJI P','CB FMM TJI U','Hoy',\
+                     'Tipo de cambio','IMPO-ASIGNADA-IVY-MDA (M)',\
+                     'EXPO-ASIGNADA-IVY-MDA (M)','IMPO-ASIGNADA-OMS-MDA (M)',\
+                     'EXPO-ASIGNADA-OMS-MDA (M)','Solar_YST','Wind_YST',\
+                     'Solar_TDY','Wind_TDY','Solar_NXT','Wind_NXT',\
+                     'Solar_SDLW','Wind_SDLW','Solar_NP15_YST','Wind_NP15_YST',\
+                     'Solar_ZP26_YST','Wind_ZP26_YST','CAISO_LOAD_YST','Solar_NP15_TDY',\
+                     'Wind_NP15_TDY','Solar_ZP26_TDY','Wind_ZP26_TDY','CAISO_LOAD_TDY',\
+                     'Solar_NP15_NXT','Wind_NP15_NXT','Solar_ZP26_NXT',\
+                     'Wind_ZP26_NXT','CAISO_LOAD_NXT'])
+
+wb = xw.Book("C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\MORNING\\B_PRE_MORNINGS_CAISO_845_930.xlsx")
+sht1 = wb.sheets['Pre_Data']
+sht1.range('A1').value=pre
+time.sleep(103)
+wb.app.quit()
+a.close()

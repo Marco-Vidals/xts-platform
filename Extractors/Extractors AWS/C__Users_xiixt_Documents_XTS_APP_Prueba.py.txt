@@ -1,0 +1,22 @@
+import BaseXTS
+import Premornings
+import MorningE 
+import subprocess
+
+scripts = ["BaseXTS.py", "Premornings.py", "MorningE.py"]
+ 
+for i, script in enumerate(scripts):
+
+    try:
+
+        subprocess.check_call(["python", script])
+
+    except subprocess.CalledProcessError:
+
+        print(f"El script {i+1} fall├│")
+
+        break
+
+    else:
+
+        print(f"El script {i+1} se ejecut├│ correctamente")

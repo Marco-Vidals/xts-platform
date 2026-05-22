@@ -1,0 +1,128 @@
+import time
+from datetime import timedelta
+import datetime
+import requests
+import json
+import pandas as pd
+
+sistema=['SIN','BCA']
+proceso=['MDA','MTR']
+nodo=['07IVY-230','07OMS-230','06LAA-138',	'06RRD-138','09LBR-230']
+# fhoy=datetime.date.today()-timedelta(days=0)
+# fecha=fhoy.strftime('%d-%m-%Y')
+# fstr=fhoy.strftime('%d%m%Y')
+def pml(sist,proc,nd,dias):
+    f=[]
+    hr=[]
+    lpml=[]
+    fhoy=datetime.date.today()-timedelta(days=dias)
+    fii=fhoy.strftime('%d%m%Y')
+    url=f'https://ws01.cenace.gob.mx:8082/SWPML/SIM/{sistema[sist]}/{proceso[proc]}/{nodo[nd]}/{fii[4:]}/{fii[2:4]}/{fii[:2]}/{fii[4:]}/{fii[2:4]}/{fii[:2]}/JSON'
+    res = requests.get(url)
+    res_dict = json.loads(res.content)
+    resultados = res_dict['Resultados']
+    for j in range(24):
+        f.append(resultados[0]['Valores'][j]['fecha'])
+        hr.append(resultados[0]['Valores'][j]['hora'])
+        lpml.append(resultados[0]['Valores'][j]['pml'])          
+    df=pd.DataFrame(zip(f,hr,lpml),columns=['fecha','hora','pml'])
+    print(url)
+    return df
+
+def actualizar_ENVERUS_CAISO(bd,serv,usern,pasw,crear_tabla,dias):
+    import pyodbc
+    import pandas as pd
+    import datetime
+    import zipfile 
+    import CaisoDA
+    import CaisoFMM
+    import numpy as np
+    
+    ivymda=pml(1,0,0,dias-1)
+    omsmda=pml(1,0,1,dias-1)
+    ivymday=pml(1,0,0,dias)
+    omsmday=pml(1,0,1,dias)
+    
+    b=datetime.datetime.today()-datetime.timedelta(days=dias)
+    #b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.replace(hour=0,minute=0,second=0,microsecond=0)
+    c=[0 for i in range(72)]
+    for i in range(72):
+        c[i]=b+datetime.timedelta(hours=i)
+        
+    ##Definimos la conexi├│n a la base
+    def conexion_bd(server, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+passw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+    
+    a=conexion_bd(serv,bd,usern,pasw)
+    
+    cursorupdate=a.cursor()
+    consulta='update DATOS_ENVERUS_CAISO set PML_IVY=?, PML_TJI=? where fecha =?'
+    consult='update DATOS_ENVERUS_CAISO set PML_IVY=?, PML_TJI=? where fecha =?'
+    for i in range(24):
+        ''' Aqui tenemos que actualizar'''
+        cursorupdate.execute(consult, ivymday.iloc[i,2],omsmday.iloc[i,2],c[i])
+        cursorupdate.execute(consulta, ivymda.iloc[i,2],omsmda.iloc[i,2],c[i+24])
+    cursorupdate.commit()
+    cursorupdate.close()
+
+def actualizar_ENVERUS_ERCOT(bd,serv,usern,pasw,crear_tabla,dias):
+    import pyodbc
+    import pandas as pd
+    import datetime
+    import zipfile 
+    import ErcotDA
+    import ErcotRt
+    import numpy as np
+    
+    ivymda=pml(0,0,2,dias-1)
+    omsmda=pml(0,0,3,dias-1)
+    ivymday=pml(0,0,2,dias)
+    omsmday=pml(0,0,3,dias)
+    
+    b=datetime.datetime.today()-datetime.timedelta(days=dias)
+    #b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.replace(hour=0,minute=0,second=0,microsecond=0)
+    c=[0 for i in range(72)]
+    for i in range(72):
+        c[i]=b+datetime.timedelta(hours=i)
+    
+    ##Definimos la conexi├│n a la base
+    def conexion_bd(server, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+passw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+    a=conexion_bd(serv,bd,usern,pasw)
+    
+    cursorupdate=a.cursor()
+    consulta='update DATOS_ENVERUS_ERCOT set PML_LAA=?, PML_RRD=? where fecha =?'
+    consult='update DATOS_ENVERUS_ERCOT set PML_LAA=?, PML_RRD=? where fecha =?'
+    
+    for i in range(24):
+        ''' Aqui tenemos que actualizar'''
+        cursorupdate.execute(consult, ivymday.iloc[i,2],omsmday.iloc[i,2],\
+                             c[i])
+        cursorupdate.execute(consulta, ivymda.iloc[i,2],omsmda.iloc[i,2],c[i+24])
+    cursorupdate.commit()
+    cursorupdate.close()
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+
+dias=1
+actualizar_ENVERUS_CAISO(bd, serv, usuario, password, 0,0)
+actualizar_ENVERUS_ERCOT(bd, serv, usuario, password, 0,0)
+
+

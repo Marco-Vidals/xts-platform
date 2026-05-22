@@ -1,0 +1,142 @@
+import requests
+import pandas as pd
+import shutil
+import xmltodict
+import json
+import zipfile
+import xml.etree.ElementTree as ET
+import datetime
+from datetime import timedelta
+import time
+import numpy as np
+
+
+
+def oasis(f,query,vrs,mk,nodo,dia):
+    if f=='h':
+        hoy=datetime.datetime.today()+timedelta(days=dia)
+        dmas1=hoy+timedelta(days=1)
+    if f=='r':
+        fi=input('Fecha inicial ("yyyy-mm-dd") : ')
+        ff=input('Fecha final ("yyyy-mm-dd") : ')
+        try:
+            hoy=datetime.datetime.strptime(fi, '%Y-%m-%d')
+            dmas1=datetime.datetime.strptime(ff, '%Y-%m-%d')+timedelta(hours=8)
+        except ValueError:
+            print("Formato de fecha incorrecto. Int├⌐ntalo de nuevo.")
+    start_date = hoy.strftime('%Y%m%d')
+    end_date = dmas1.strftime('%Y%m%d')
+    
+    url = 'http://oasis.caiso.com/oasisapi/SingleZip'
+    # Definir los par├ímetros de la consulta
+    params = {
+        'queryname': f'{query}',
+        'startdatetime': f'{start_date}T07:00-0000',
+        'enddatetime': f'{end_date}T07:00-0000',
+        'version': f'{vrs}',
+        'market_run_id': f'{mk}',
+        'node': f'{nodo}'
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        
+        # Guardar la respuesta en un archivo zip
+        with open('data.zip', 'wb') as f:
+            f.write(response.content)
+    
+        # Abrir el archivo zip descargado
+        with zipfile.ZipFile('data.zip', 'r') as zip_ref:
+            file_names = zip_ref.namelist()
+            for file_name in file_names:
+               if file_name.endswith('.xml'): # Aqu├¡ se verifica si el archivo es un archivo xml
+                   print(f'El archivo xml es: {file_name}')  
+    
+        with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\data.zip', 'r') as zip_ref:
+            zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+        #shutil.move(f'C:\\Windows\\SYSTEM32\\{file_name}', 'datada.xml') 
+    
+        # Leer el archivo XML
+        with open(f'{file_name}') as xml_file:
+            data_dict = xmltodict.parse(xml_file.read())
+        
+        oasisdata=data_dict['OASISReport']  
+        
+    except:
+        print("El archivo a├║n no est├í disponible")
+        hoy=datetime.datetime.today()
+        dmas1=datetime.datetime.today()+timedelta(days=1)
+        start_date = hoy.strftime('%Y%m%d')
+        end_date = dmas1.strftime('%Y%m%d')
+        
+        time.sleep(5)
+        
+        url = 'http://oasis.caiso.com/oasisapi/SingleZip'
+        # Definir los par├ímetros de la consulta
+        params = {
+            'queryname': f'{query}',
+            'startdatetime': f'{start_date}T07:00-0000',
+            'enddatetime': f'{end_date}T07:00-0000',
+            'version': f'{vrs}',
+            'market_run_id': f'{mk}',
+            'node': f'{nodo}'
+        }
+        
+        response = requests.get(url, params=params)
+        
+        with open('data.zip', 'wb') as f:
+            f.write(response.content)
+    
+        # Abrir el archivo zip descargado
+        with zipfile.ZipFile('data.zip', 'r') as zip_ref:
+            file_names = zip_ref.namelist()
+            for file_name in file_names:
+               if file_name.endswith('.xml'): # Aqu├¡ se verifica si el archivo es un archivo xml
+                   print(f'El archivo xml es: {file_name}')  
+    
+        with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\data.zip', 'r') as zip_ref:
+            zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+        #shutil.move(f'C:\\Windows\\SYSTEM32\\{file_name}', 'datada.xml') 
+    
+        # Leer el archivo XML
+        with open(f'{file_name}') as xml_file:
+            data_dict = xmltodict.parse(xml_file.read())
+    
+    
+        
+    oasisdata=data_dict['OASISReport']  
+    data=oasisdata['MessagePayload']
+    data=data['RTO']
+    data=data['REPORT_ITEM']
+    
+    '''(data[0]['REPORT_DATA'])'''
+    def datos(num,title):
+        hr=[]
+        pr=[]
+        int(num)
+        for i in range(24):
+            try:
+                a=data[num]['REPORT_DATA'][i]
+                hora=int(a['INTERVAL_NUM'])
+                price=a['VALUE']
+                hr.append(hora)
+                pr.append(price)
+                file=pd.DataFrame(zip(hr,pr),columns=['Hora',title])
+                file=file.sort_values(by=['Hora'], ascending=True)
+            except:
+                file=pd.DataFrame(np.zeros((24, 2)),columns=['Hora',title])
+        return file
+    
+    lmp=datos(0,f'LMP_{nodo}')
+    cong=datos(1,f'CONG_{nodo}')
+    engy=datos(2,f'ENERGY_{nodo}')
+    loss=datos(3,f'LOSS_{nodo}')
+    ghg=datos(4,f'GHG_{nodo}')
+        
+    df_union = pd.merge(engy, loss, on='Hora').merge(ghg,on='Hora')
+    df_u=pd.merge(lmp, cong, on='Hora').merge(df_union,on='Hora')
+    
+    return df_u
+  
+  
+ah1=oasis('h', 'PRC_LMP','12','DAM','ROA-230_2_N101',0)    

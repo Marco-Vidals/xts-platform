@@ -1,0 +1,75 @@
+import pyodbc 
+import pandas as pd
+import requests
+import json
+from selenium.webdriver.common.by import By
+import pytemperature
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import lxml
+import urllib.request
+import shutil
+import re
+import os
+import datetime
+import glob
+from selenium import webdriver
+import random
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+def daercot(dia):
+    url='https://www.ercot.com/misapp/GetReports.do?reportTypeId=12331&reportTitle=DAM%20Settlement%20Point%20Prices&showHTMLView=&mimicKey'
+    link=requests.get(url).text
+    soup=BeautifulSoup(link,'html.parser')
+    names=[]
+    urls=[]
+    for a in soup.find_all(class_='labelOptional_ind'):
+        names.append(a.text)
+    
+    for a in soup.find_all('a'):
+        ref=a.get('href')
+        urls.append(ref)
+        
+    hoy=datetime.date.today()-timedelta(days=dia)
+    hoy=hoy.strftime('%Y%m%d')
+    
+    salida='salida'
+    
+    df=pd.DataFrame(zip(names,urls),columns=['Nombre','Links'])
+    label=soup.find(class_='labelOptional_ind').text
+    name=label[0:30]
+    file=f'{name}{hoy}'
+    
+    for i in range(0,10,2):
+        a=(df.iloc[i,0])[0:38]
+        b=df.iloc[i,1]
+        c=df.iloc[i,0]
+        if c[0:38]==file:
+            break
+    
+    descarga=f'https://www.ercot.com/{b}'
+    kk=f'{salida}_csv.zip'
+    with urllib.request.urlopen(descarga) as response, open(kk,'wb') as out_solar:
+        shutil.copyfileobj(response,out_solar)
+    
+    with zipfile.ZipFile(kk, 'r') as zip_ref:
+        file_names = zip_ref.namelist()
+        for file_name in file_names:
+           if file_name.endswith('.csv'): 
+               print(f'El archivo csv es: {file_name}') 
+    
+    with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\{salida}_csv.zip','r') as zip_ref:
+        zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+    
+    solar_csv=os.path.join(f'C:\\Windows\\SYSTEM32\\{file_name}')
+    new=os.path.join(f'C:\\Windows\\SYSTEM32\\{salida}.csv')
+    shutil.move(solar_csv,new)
+    
+    data=pd.read_csv('salida.csv')
+    #data=data[data['SettlementPoint'].isin(['DC_L','DC_R'])]
+    # dcr=data[data['SettlementPoint'].isin(['DC_R'])]
+    
+    return data

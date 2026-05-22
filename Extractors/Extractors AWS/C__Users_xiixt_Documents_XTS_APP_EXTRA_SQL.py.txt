@@ -1,0 +1,94 @@
+# -*- coding: utf-8 -*-
+"""
+create table EXTRA_ENVERUS_ERCOT(hoy datetime,
+CB_P_LAA float, CB_U_LAA float, CB_P_DCL_RT float, CB_U_DCL_RT float,
+CB_P_DCL_DA float, CB_U_DCL_DA float,
+CB_P_RRD float, CB_U_RRD float, CB_P_DCR_RT float, CB_U_DCR_RT float,
+CB_P_DCR_DA float, CB_U_DCR_DA float)
+
+create table EXTRA_ENVERUS_CAISO(hoy datetime,
+CB_P_IVY float, CB_U_IVY float, CB_P_ROA_FMM float, CB_U_ROA_FMM float,
+CB_P_ROA_DA float, CB_U_ROA_DA float,
+CB_P_OMS float, CB_U_OMS float, CB_P_TJI_FMM float, CB_U_TJI_FMM float,
+CB_P_TJI_DA float, CB_U_TJI_DA float)
+"""
+def EXTRA_SQL_ENVERUS(bd,serv,usern,pasw):
+    import pyodbc
+    import pandas as pd
+    import datetime
+    import numpy as np
+    import GITBASH
+    import zipfile 
+    
+    def conexion_bd(serv, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+pasw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+
+    a=conexion_bd(serv,bd,usern,pasw)
+
+    with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\forecast.zip', 'r') as zip_ref:
+        zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+    
+    cbivy=pd.read_csv('ConfidenceBand_MexicoAhd07IVY-230.csv',skiprows=39)
+    cboms=pd.read_csv('ConfidenceBand_MexicoAhd07OMS-230.csv',skiprows=39)
+    cbdaroa=pd.read_csv('ConfidenceBand_CaisAhdROA230_2_N101.csv',skiprows=39)
+    cbdatji=pd.read_csv('ConfidenceBand_CaisAhdTJI230_2_N101.csv',skiprows=39)
+    cbfroa=pd.read_csv('ConfidenceBand_CaisFmmROA-230_2_N101.csv',skiprows=39)
+    cbftji=pd.read_csv('ConfidenceBand_CaisFmmTJI-230_2_N101.csv',skiprows=39)
+    
+    cbdadcl=pd.read_csv('ConfidenceBand_ErcotAhdDCL.csv',skiprows=39)
+    cbdadcr=pd.read_csv('ConfidenceBand_ErcotAhdDCR.csv',skiprows=39)
+    cbrtdcl=pd.read_csv('ConfidenceBand_ErcotRtDCL.csv',skiprows=39)
+    cbrtdcr=pd.read_csv('ConfidenceBand_ErcotRtDCR.csv',skiprows=39)
+    cblaa=pd.read_csv('ConfidenceBand_MexicoAhd06LAA-138.csv',skiprows=39)
+    cbrrd=pd.read_csv('ConfidenceBand_MexicoAhd06RRD-138.csv',skiprows=39)
+
+    
+    td_str=str(cbivy.iloc[0,0])
+    td=datetime.datetime.today()+datetime.timedelta(days=1)
+    td=td.replace(hour=0,minute=0,second=0,microsecond=0)
+    val=0
+    c=[0 for i in range(24)]
+    for i in range(24):
+        c[i]=td+datetime.timedelta(hours=i)
+    if val==0:
+        print('Continuemos')
+        consulta1='insert into CB_CAISO (fecha,\
+        CB_P_IVY, CB_U_IVY, CB_P_ROA_FMM, CB_U_ROA_FMM,\
+        CB_P_ROA_DA, CB_U_ROA_DA ,\
+        CB_P_OMS , CB_U_OMS, CB_P_TJI_FMM, CB_U_TJI_FMM,\
+        CB_P_TJI_DA, CB_U_TJI_DA) values (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                
+        consulta2='insert into CB_ERCOT(fecha,\
+            CB_P_LAA, CB_U_LAA, CB_P_DCL_RT, CB_U_DCL_RT,\
+            CB_P_DCL_DA, CB_U_DCL_DA,\
+            CB_P_RRD, CB_U_RRD, CB_P_DCR_RT, CB_U_DCR_RT,\
+            CB_P_DCR_DA, CB_U_DCR_DA) values(?,?,?,?,?,?,?,?,?,?,?,?,?)' 
+        try:
+            for i in range(24):
+                a.execute(consulta1, c[i],cbivy.iloc[i,3],cbivy.iloc[i,4],\
+                          cbfroa.iloc[i,3],cbfroa.iloc[i,4],cbdaroa.iloc[i,3],\
+                              cbdaroa.iloc[i,4],cboms.iloc[i,3],cboms.iloc[i,4],\
+                                  cbftji.iloc[i,3],cbftji.iloc[i,4],\
+                                      cbdatji.iloc[i,3],cbdatji.iloc[i,4])
+                a.execute(consulta2,c[i],cblaa.iloc[i,3],cblaa.iloc[i,4],\
+                          cbrtdcl.iloc[i,3],cbrtdcl.iloc[i,4],cbdadcl.iloc[i,3],\
+                              cbdadcl.iloc[i,4],cbrrd.iloc[i,3],cbrrd.iloc[i,4],\
+                                  cbrtdcr.iloc[i,3],cbrtdcr.iloc[i,4],\
+                                      cbdadcr.iloc[i,3],cbdadcr.iloc[i,4])
+            a.close()
+        except:
+            print('No continuemos')
+    else:
+        print('No continuemos')
+        a.close()
+        print(td.strftime('%m/%d/%y'))
+        print(td_str)
+        print(td.strftime('%m/%d/%y')==td_str)
+
+    print("confidence band")

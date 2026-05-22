@@ -1,0 +1,109 @@
+import numpy as np
+import pandas as pd
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import lxml
+import urllib.request
+import shutil
+import re
+import os
+import pytemperature
+import pyodbc
+from datetime import datetime     
+
+crear=0
+
+# serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+# bd='XTS'
+# usuario='sa'
+# password='XTSoperations7530159'
+
+# serv='LAPTOP-VI3QO147'
+# bd='prueba'
+# usuario='soporte'
+# password='7530159'
+def impexp(bd,serv,usuario,password,dias):
+    conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+    a=conx.cursor()
+    
+    def asignacion(sistema):
+        if sistema=='SIN':
+            try:
+                sin=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/{sistema}/MDA/{hoy2[4:]}/{hoy2[2:4]}/{hoy2[0:2]}/{hoy2[4:]}/{hoy2[2:4]}/{hoy2[0:2]}/JSON'
+                print(sin)
+                res = requests.get(sin)
+                res_dict = json.loads(res.content)
+                resultados = res_dict['Resultados']
+                resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+                df_LAA=resultados_api2[0]
+                df_RRD=resultados_api2[1]
+                df_LBR = resultados_api2[3]
+
+            except:
+                df_LAA=pd.DataFrame(np.zeros((24, 4)))
+                df_RRD=pd.DataFrame(np.zeros((24, 4)))   
+                df_LBR = pd.DataFrame(np.zeros((24, 4)))
+            return df_LAA, df_RRD, df_LBR
+        
+        if sistema=='BCA':
+            try:
+                bca=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/{sistema}/MDA/{hoy2[4:]}/{hoy2[2:4]}/{hoy2[0:2]}/{hoy2[4:]}/{hoy2[2:4]}/{hoy2[0:2]}/JSON'
+                print(bca)
+                res = requests.get(bca)
+                res_dict = json.loads(res.content)
+                resultados = res_dict['Resultados']
+                resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))]
+                df_IVY=resultados_api2[0]
+                df_OMS=resultados_api2[1]
+            except:
+                df_IVY=pd.DataFrame(np.zeros((24, 4)))
+                df_OMS=pd.DataFrame(np.zeros((24, 4))) 
+            return df_IVY, df_OMS
+        
+    for j in range(dias):
+        # fi='22-08-2022'
+        aa=datetime.now().date()-timedelta(days=j)
+        
+        # a3=((datetime.now()).date()-aa)/timedelta(days=1)
+        # hoy=(datetime.strptime(fi,'%d-%m-%Y')).date()+timedelta(days=1)
+        
+        if crear==1:
+            consulta= 'create table IMPEXP (fecha datetime primary key,IMPO_LAA int, EXPO_LAA int,\
+                IMPO_RRD int, EXPO_RRD int,IMPO_IVY int, EXPO_IVY int, IMPO_OMS int,\
+                    EXPO_OMS int)'
+            a.execute(consulta)
+           
+        #for i in range(int(a3)):
+        #aa=aa+timedelta(days=1)
+        hoy2=aa.strftime('%d%m%Y')
+        aa2=datetime.combine(aa,datetime.min.time())
+        #hoy=hoy+timedelta(days=1)
+        #hoy3=hoy.strftime('%d%m%Y')
+        b=aa2.replace(hour=0,minute=0)
+        c=[0 for i in range(24)]
+        for i in range(0,24):
+            c[i]=b+timedelta(hours=i)
+        #IMP-EXP Asignada
+        psin=asignacion('SIN')
+        pbca=asignacion('BCA')
+        consulta='insert into IMPEXP (fecha, IMPO_LAA, EXPO_LAA, IMPO_RRD, EXPO_RRD,\
+            IMPO_IVY,EXPO_IVY,IMPO_OMS,EXPO_OMS,IMPO_LBR,EXPO_LBR) \
+            values(?,?,?,?,?,?,?,?,?,?,?)'
+        try:
+            for i in range(0,24):
+                a.execute(consulta,c[i],int(float(psin[0].iloc[i,2])),psin[0].iloc[i,7],int(float(psin[1].iloc[i,2])),\
+                          psin[1].iloc[i,7],pbca[0].iloc[i,2],pbca[0].iloc[i,7],\
+                              pbca[1].iloc[i,2],pbca[1].iloc[i,7],psin[2].iloc[i,2],psin[2].iloc[i,7])
+        except:
+            print("Datos existentes")
+
+    
+        
+        

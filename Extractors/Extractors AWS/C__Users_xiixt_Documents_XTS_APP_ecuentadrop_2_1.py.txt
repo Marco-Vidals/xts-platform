@@ -1,0 +1,148 @@
+# -*- coding: utf-8 -*-
+
+"""
+Created on Thu Jul 27 12:23:15 2023
+
+@author: Yisus craist
+"""
+
+import zipfile
+import datetime
+import csv
+import io
+import codecs
+import base64
+import csv
+import binascii
+from suds.client import Client
+from zeep import Client
+import zipfile36 as zipfile
+import shutil
+import os
+import pandas as pd
+import pytemperature
+import pyodbc
+from datetime import timedelta
+import numpy
+
+def remove_strings_with_endings(input_list, endings_to_remove):
+    output_list = [s for s in input_list if not any(s.endswith(ending) for ending in endings_to_remove)]
+    return output_list
+
+print('Sistemas: \n BCA: 1 \n SIN: 2')
+sst=float(input("Ingrese el sistema   "))
+
+#users=['EnriqueXTSBCA','EnriqueXTSSIN']
+pssw='Xtsmvb1#'
+
+start = datetime.datetime(2026,3,16)
+print(start)
+end = datetime.datetime(2026,3,22) ##INCLUYE ESTA FECHA
+print(end)
+num_days = (end-start).days
+listafechas=[]
+listafechas.append(start)
+for i in range(num_days):
+    start+=timedelta(days=1)
+    listafechas.append(start)
+if start!=end:
+    listafechas.append(end)
+
+missing_files=[]
+for i in range(len(listafechas)):
+    dia=listafechas[i]
+    title_list=[]
+    
+    url = "https://ws01.cenace.gob.mx:8081/WSDownLoadEdoCta/EdoCuentaService.svc?singleWsdl"
+    client = Client(wsdl=url)    
+    dd=dia.strftime('%Y/%m/%d')
+    
+    if sst==1:
+        users='MarcoXTSBCA'
+        sistema='BCA'
+        sc=['ERO','ITJ','ETJ','IRO']
+        for i in range(len(sc)):
+            year = str(dia.year)
+            month = str(dia.month).zfill(2)
+            day = str(dia.day).zfill(2)
+            title=f"EC{year}{month}{day}BCA-M024{sc[i]}"
+            title_list.append(title)
+        print(f"We should (hopefully haha) be downloading {title_list}")
+    
+    if sst==2:
+        users='MarcoXTSSIN'
+        sistema='SIN'
+        sc=['EEP','ERD','ILA','EGT','IEP','IRD','ELA','IGT','TBF']
+        for i in range(len(sc)):
+            year = str(dia.year)
+            month = str(dia.month).zfill(2)
+            day = str(dia.day).zfill(2)
+            title=f"EC{year}{month}{day}SIN-M024{sc[i]}"
+            title_list.append(title)
+        print(f"We should (hopefully haha) be downloading {title_list}")
+        
+    archivo  = client.service.GetEstadoCuentas(users,  pssw,  dia, sistema, "M024", None, "C")
+    try:
+        names=[]
+        subc=[]
+        for i in archivo.EC.EdoCuenta:
+            result = base64.b64encode(i.File_C)
+            subc.append(i.Subcuenta)
+            decoded_content = base64.b64decode(result)
+            name_start=decoded_content.find(b'E')
+        #name_end=decoded_content.find(b'"',name_start)
+            name_bytes=decoded_content[name_start:name_start+44]
+            name=name_bytes.decode()
+            names.append(name)
+        # Extract the CSV file from the zip archive
+            with zipfile.ZipFile(io.BytesIO(decoded_content)) as zip_file:
+                csv_file = zip_file.extract(name, f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS R&D\\Facturacion\\Ecuenta Drop')
+                print(f"Extracted CSV file: {csv_file}")
+    except:
+        print('Maldito gobierno, no funciona bien el API')
+    
+    names20=[]
+    for i in names:
+        short_name=i[0:21]
+        names20.append(short_name)
+    
+    for i in range(len(names)):
+        source_file = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS R&D\\Facturacion\\Ecuenta Drop\\{names[i]}'
+        destination_file = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS R&D\\Facturacion\\Ecuenta Drop\\{names20[i]}.csv'
+        shutil.move(source_file, destination_file)
+    
+    print('\n','Now we will check if all the files were downloaded \n')
+    
+    for i in range(len(title_list)):
+        directory_path = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS R&D\\Facturacion\\Ecuenta Drop'
+        file_name = f'{title_list[i]}.csv'
+        file_path = os.path.join(directory_path, file_name)
+        print(f'searching for {file_path}')
+        if os.path.exists(file_path):
+            print(f"The file '{file_name}' exists in the directory.")
+        else:
+            missing_files.append(title_list[i])
+            print(f"The file '{file_name}' does not exist in the directory.")
+    
+    remover=['EEP','IEP']    ## LA LISTA DE LOS EDOS DE CUENTA QUE NO QUEREMOS
+    if sst == 2:
+        remover_list=[]
+        for i in range(len(remover)):
+            removed_path=f"EC{year}{month}{day}SIN-M024{remover[i]}"
+            remover_list.append(removed_path)
+        
+        for i in range(len(remover)):
+            directory_path = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS R&D\\Facturacion\\Ecuenta Drop'
+            file_name = f'{remover_list[i]}.csv'
+            file_path = os.path.join(directory_path, file_name)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"The file '{file_name}' has been deleted.")
+
+if len(missing_files) == 0:
+    print("No hace falta descargar archivos")
+else:
+    missing_files = remove_strings_with_endings(missing_files, remover) #QUITAMOS DE LA LISTA DE ARCHIVOS FALTANTES LO QUE NO NECESITAMOS (Eagle pass, etc)     
+    print(f"Hace falta descargar los archivos {missing_files}")
+
+

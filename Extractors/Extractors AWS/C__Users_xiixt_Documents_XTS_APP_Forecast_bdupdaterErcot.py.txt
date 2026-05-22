@@ -1,0 +1,86 @@
+import pandas as pd
+import datetime
+from datetime import timedelta
+import xlwings as xw
+import shutil
+
+
+tiempo_inicio = datetime.datetime.now() 
+
+# Fechas para abrir archivos
+fecha = datetime.datetime.now()
+fecha_menos_uno = fecha - timedelta(days = 1)
+fecha_mas_uno = fecha + timedelta(days = 1)
+fecha_fin = (fecha_mas_uno + timedelta(days = 6)) #para capacidades
+fecha_str_ayer = fecha_menos_uno.strftime('%x')
+fecha_str_hoy = fecha.strftime('%x') #mm/dd/aa
+fecha_str_manana = fecha_mas_uno.strftime('%x')
+fecha_str_fin = fecha_fin.strftime('%x')
+
+dia_hoy = fecha_str_hoy[3:5]
+mes_hoy = fecha_str_hoy[0:2]
+anio_hoy = fecha_str_hoy[6:]
+
+anio2 = fecha_str_fin[6:]
+mes2 = fecha_str_fin[0:2]
+dia2 = fecha_str_fin[3:5]
+
+dia_manana = fecha_str_manana[3:5]
+mes_manana = fecha_str_manana[0:2]
+anio_manana = fecha_str_manana[6:]
+
+dia_ayer = fecha_str_ayer[3:5]
+mes_ayer = fecha_str_ayer[0:2]
+anio_ayer = fecha_str_ayer[6:]
+
+
+original = r'C:\\Users\\ale_a\\Documents\\XTS\\APP\\forecast.zip'
+
+target_file = f'{dia_hoy}-{mes_hoy}-{anio_hoy}-forecast.zip'
+
+target = f'G:\\Unidades compartidas\\BBXTS2.0\\FORECAST_ENV\\{target_file}'
+shutil.copyfile(original, target)
+
+print("Enverus respaldado")
+
+"""
+original = r'G:\\Unidades compartidas\\IMPEX\\IMPEX\\OFERTAS\\CAISO\\BBCAISO2\\compra_M02407OMS01.xlsx'
+
+target_file = f'{dia_hoy}-{mes_hoy}-{anio_hoy} compra M02407OMS01  {dia_manana}-{mes_manana}-{anio_manana} al {dia_manana}-{mes_manana}-{anio_manana}  001-1.xlsx'
+
+target = f'G:\\Unidades compartidas\\IMPEX\\IMPEX\\OFERTAS\\CAISO\\{mes_manana}\\{dia_manana}\\{target_file}'
+shutil.copyfile(original, target)
+
+
+original = r'G:\\Unidades compartidas\\IMPEX\\IMPEX\\OFERTAS\\CAISO\\BBCAISO2\\venta_M02407IVYIMP.xlsx'
+
+target_file = f'{dia_hoy}-{mes_hoy}-{anio_hoy} venta M02407IVYIMP  {dia_manana}-{mes_manana}-{anio_manana} al {dia_manana}-{mes_manana}-{anio_manana}  001-1.xlsx'
+
+target = f'G:\\Unidades compartidas\\IMPEX\\IMPEX\\OFERTAS\\CAISO\\{mes_manana}\\{dia_manana}\\{target_file}'
+shutil.copyfile(original, target)
+
+
+
+original = r'G:\\Unidades compartidas\\IMPEX\\IMPEX\\OFERTAS\\CAISO\\BBCAISO2\\venta_M02407OMSIMP.xlsx'
+
+target_file = f'{dia_hoy}-{mes_hoy}-{anio_hoy} venta  M02407OMSIMP  {dia_manana}-{mes_manana}-{anio_manana} al {dia_manana}-{mes_manana}-{anio_manana}  001-1.xlsx'
+
+target = f'G:\\Unidades compartidas\\IMPEX\\IMPEX\\OFERTAS\\CAISO\\{mes_manana}\\{dia_manana}\\{target_file}'
+shutil.copyfile(original, target)
+
+
+
+
+original = r'G:\\Unidades compartidas\\IMPEX\\IMPEX\\Shell\\OPERATIONS\\BBCAISO3\\XIIX-SENA operations.xlsx'
+
+target_file = f'XIIX-SENA operations for {mes_manana}-{dia_manana}-20{anio_manana}-1.xlsx'
+
+target = f'G:\\Unidades compartidas\\IMPEX\\IMPEX\\Shell\\OPERATIONS\\{mes_manana}\\{target_file}'
+shutil.copyfile(original, target)
+
+
+
+
+print("eres un chingon gracias a Jesucristo")
+
+"""

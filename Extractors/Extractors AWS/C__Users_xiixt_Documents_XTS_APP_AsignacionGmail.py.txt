@@ -1,0 +1,363 @@
+# -*- coding: utf-8 -*-
+def Asig_SQL_CAISO(bd,serv,usern,pasw,crear_tabla):
+    import imaplib, email
+    import datetime
+    import os
+    import pandas as pd
+    import numpy as np
+    import pyodbc
+    
+    '''Entre comillas voy a poner lo que creo que se tiene que activar para el
+    CENACE'''
+    b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.strftime('%m/%d/%Y')
+    user='24hr@xiix.mx'
+    password='XTS24hrs@'
+    imap_url='imap.gmail.com'
+    attatchment_dir='C:\\Users\\emuni\\Downloads'
+    
+    def get_body(msg):
+        ##Aqui checamos si el mail tiene varias cosas como texto y attatchments
+        if msg.is_multipart():
+            return get_body(msg.get_payload(0))
+        else:
+            return msg.get_payload(None,True)
+    def get_attatchments(msg):
+        for part in msg.walk():
+            if part.get_content_maintype()=='multipart':
+                continue
+            if part.get('Content-Disposition') is None:
+                continue
+            fileName=part.get_filename()
+            
+            if bool(fileName):
+                filePath = os.path.join(attatchment_dir,fileName)
+                with open(filePath,'wb') as f:
+                    f.write(part.get_payload(decode=True))
+    ##Aqui vamos a buscar
+    def search(key,value,con):
+        result,data = con.search(None,key,'"{}"'.format(value))
+        return data
+    def get_emails(result_bytes):
+        msgs=[]
+        for num in result_bytes[0].split():
+            typ, data=con.fetch(num,'(RFC822)')
+            msgs.append(data)
+        return msgs
+    def mes_txt(mes):
+        if mes=='01':
+            mes='enero'
+        elif mes=='02':
+            mes='febrero'
+        elif mes=='03':
+            mes='marzo'
+        elif mes=='04':
+            mes='abril'
+        elif mes=='05':
+            mes='mayo'
+        elif mes=='06':
+            mes='junio'
+        elif mes=='07':
+            mes='julio'
+        elif mes=='08':
+            mes='agosto'
+        elif mes=='09':
+            mes='septiembre'
+        elif mes=='10':
+            mes='octubre'
+        elif mes=='11':
+            mes='noviembre'
+        elif mes=='12':
+            mes='diciembre'
+        else:
+            print('error con el formato')
+        return mes
+    con=imaplib.IMAP4_SSL(imap_url)
+    con.login(user,password)
+    con.list()
+    ##Aqui vamos a tener que cambiar la lista por el filtro del CENACE
+    con.select('CENACE')
+    '''con.select('Emilio')'''
+    ##Aqui tenemos el n├║mero del mail relacionado con el filtro que le estamos
+    ##aplicando, entonces tenemos que vamos a escoger el d├⌐cimo mail
+    ##contando de arriba para abajo
+    ## con este command podemos buscar la ubicaci├│n de d├│nde est├í el mail
+    ## con el subject que buscamos
+    ##Tenemos que hacer el subject
+    ##Pero tenemos que sacar el mail del cenace
+    #search('SUBJECT','Operations for 05/16/2022',con)
+    ##msgs=get_emails(search('SUBJECT','Operations for 05/16/2022',con))
+    ##for msg in msgs:
+        ##
+    
+    b=datetime.datetime.today()+datetime.timedelta(days=1)
+    dia=b.strftime('%d')
+    anio=b.strftime('%Y')
+    mes=b.strftime('%m')
+    mes2=mes_txt(mes)
+
+    subj_txt=f'Asignaci├│n del {dia} de {mes2} del {anio} M024-XiiX BCA'
+    ##Aqui ponemos el ├¡ndice del mail que tiene el titulo de la asignacion
+    try:
+        ind=search('SUBJECT',subj_txt)
+        ##Luego hacemos que busque y agarre el mail
+        
+        result,data = con.fetch(ind[0],'(RFC822)')
+        
+        raw=email.message_from_bytes(data[0][1])
+        
+        get_attatchments(raw)
+        cols=[6+i for i in range(24)]
+        file_desc=f'{attatchment_dir}\\Energ├¡a asignada {dia}{mes}{anio} M024-XiiX.xlsx'
+        
+        asig=pd.read_excel(file_desc,skiprows=3,usecols=cols,nrows=5,header=0)
+        
+        asig_t=np.transpose(asig)
+
+    except:
+        asig_t=pd.DataFrame(np.zeros((24,4)))
+   
+        
+    
+    ##result,data = con.fetch(b'10','(RFC822)')
+    ##Extrameos los bytes
+    ##raw=email.message_from_bytes(data[0][1])
+    ##print(get_body(raw))
+    
+    ##Tenemos que decodificar el attatchemnt
+    
+    ##get_attatchments(raw)
+    
+    ##Ya que tenemos en local descargado el documento, tenemos que pasarlo a SQL
+    ##Descarguemos el archivo 
+
+    
+    '''file_desc=f'{attatchment_dir}\\Energ├¡a asignada 18072022 M024-XiiX.xlsx'''
+    ##cols=[6+i for i in range(24)]
+    
+    ##asig=pd.read_excel(file_desc,skiprows=3,usecols=cols,nrows=5,header=0)
+    
+    ##asig.to_csv(f'{attatchment_dir}\\prueba1.csv')
+    
+    ##Ya que tenemos el archivo de forma local
+    ##Vamos a extraer los datos para subirlos a la bd
+    ##asig_t=np.transpose(asig)
+
+    def conexion_bd(server, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+passw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+    a=conexion_bd(serv,bd,usern,pasw)
+    
+
+    if crear_tabla==1:
+        consulta='create table Asign_CAISO (fecha datetime primary key,\
+            Impo_ROA int, Impo_OMS int,Expo_ROA int, Expo_OMS int)'
+        cursorcreate=a.cursor()
+        cursorcreate.execute(consulta)
+        cursorcreate.commit()
+        cursorcreate.close()
+    ##Fecha
+    b=datetime.datetime.today()+datetime.timedelta(days=1)
+    #b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.replace(hour=0,minute=0,second=0,microsecond=0)
+    c=[0 for i in range(24)]
+    for i in range(24):
+        c[i]=b+datetime.timedelta(hours=i)
+    
+    ##Ahora vamos a insertar las asignaciones
+    try:
+        cursorinsert=a.cursor()
+        consulta='insert into Asign_CAISO (fecha, Impo_ROA, Impo_OMS,\
+            Expo_ROA, Expo_OMS) values (?,?,?,?,?)'
+        for i in range(24):
+            cursorinsert.execute(consulta,c[i],asig_t.iloc[i,0],asig_t.iloc[i,1],\
+                                 asig_t.iloc[i,2],asig_t.iloc[i,3])
+        cursorinsert.commit()
+        cursorinsert.close()
+    except:
+        cursorupdate=a.cursor()
+        consulta='update Asign_CAISO set Impo_ROA=?,\
+             Impo_OMS=?,Expo_ROA=?,Expo_OMS=? where fecha=?'
+        for i in range(24):
+            cursorupdate.execute(consulta,asig_t.iloc[i,0],asig_t.iloc[i,1],\
+                                 asig_t.iloc[i,2],asig_t.iloc[i,3],c[i])
+
+        
+    a.close()
+
+def Asig_SQL_ERCOT(bd,serv,usern,pasw,crear_tabla):
+    import imaplib, email
+    import datetime
+    import os
+    import pandas as pd
+    import numpy as np
+    import pyodbc
+    '''Entre comillas voy a poner lo que creo que se tiene que activar para el
+    CENACE'''
+    b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.strftime('%m/%d/%Y')
+    user='24hr@xiix.mx'
+    password='XTS24hrs@'
+    imap_url='imap.gmail.com'
+    attatchment_dir='C:\\Users\\emuni\\Downloads'
+    
+    def get_body(msg):
+        ##Aqui checamos si el mail tiene varias cosas como texto y attatchments
+        if msg.is_multipart():
+            return get_body(msg.get_payload(0))
+        else:
+            return msg.get_payload(None,True)
+    def get_attatchments(msg):
+        for part in msg.walk():
+            if part.get_content_maintype()=='multipart':
+                continue
+            if part.get('Content-Disposition') is None:
+                continue
+            fileName=part.get_filename()
+            
+            if bool(fileName):
+                filePath = os.path.join(attatchment_dir,fileName)
+                with open(filePath,'wb') as f:
+                    f.write(part.get_payload(decode=True))
+    ##Aqui vamos a buscar
+    def search(key,value,con):
+        result,data = con.search(None,key,'"{}"'.format(value))
+        return data
+    def get_emails(result_bytes):
+        msgs=[]
+        for num in result_bytes[0].split():
+            typ, data=con.fetch(num,'(RFC822)')
+            msgs.append(data)
+        return msgs
+    def mes_txt(mes):
+        if mes=='01':
+            mes='enero'
+        elif mes=='02':
+            mes='febrero'
+        elif mes=='03':
+            mes='marzo'
+        elif mes=='04':
+            mes='abril'
+        elif mes=='05':
+            mes='mayo'
+        elif mes=='06':
+            mes='junio'
+        elif mes=='07':
+            mes='julio'
+        elif mes=='08':
+            mes='agosto'
+        elif mes=='09':
+            mes='septiembre'
+        elif mes=='10':
+            mes='octubre'
+        elif mes=='11':
+            mes='noviembre'
+        elif mes=='12':
+            mes='diciembre'
+        else:
+            print('error con el formato')
+        return mes
+    con=imaplib.IMAP4_SSL(imap_url)
+    con.login(user,password)
+    con.list()
+    ##Aqui vamos a tener que cambiar la lista por el filtro del CENACE
+    con.select('CENACE')
+    ##con.select('Emilio')
+    ##Aqui tenemos el n├║mero del mail relacionado con el filtro que le estamos
+    ##aplicando, entonces tenemos que vamos a escoger el d├⌐cimo mail
+    ##contando de arriba para abajo
+    ## con este command podemos buscar la ubicaci├│n de d├│nde est├í el mail
+    ## con el subject que buscamos
+    ##Tenemos que hacer el subject
+    ##Pero tenemos que sacar el mail del cenace
+    #search('SUBJECT','Operations for 05/16/2022',con)
+    ##msgs=get_emails(search('SUBJECT','Operations for 05/16/2022',con))
+    ##for msg in msgs:
+        ##
+    
+    b=datetime.datetime.today()+datetime.timedelta(days=1)
+    dia=b.strftime('%d')
+    anio=b.strftime('%Y')
+    mes=b.strftime('%m')
+    mes2=mes_txt(mes)
+    subj_txt=f'Asignaci├│n del {dia} de {mes2} del {anio} M024-XiiX BCA'
+    ##Aqui ponemos el ├¡ndice del mail que tiene el titulo de la asignacion
+    try:
+        ind=search('SUBJECT',subj_txt)
+        ##Luego hacemos que busque y agarre el mail
+        
+        result,data = con.fetch(ind[0],'(RFC822)')
+        
+        raw=email.message_from_bytes(data[0][1])
+        
+        get_attatchments(raw)
+        cols=[6+i for i in range(24)]
+        file_desc=f'{attatchment_dir}\\Energ├¡a asignada {dia}{mes}{anio} M024-XiiX.xlsx'    
+        asig=pd.read_excel(file_desc,skiprows=3,usecols=cols,nrows=5,header=0)
+        
+        asig_t=np.transpose(asig)
+
+    except:
+        asig_t=pd.DataFrame(np.zeros((24,8)))
+   
+        
+    '''
+    result,data = con.fetch(b'10','(RFC822)')
+    ##Extrameos los bytes
+    raw=email.message_from_bytes(data[0][1])
+    ##print(get_body(raw))
+    
+    ##Tenemos que decodificar el attatchemnt
+    
+    get_attatchments(raw)
+    
+    ##Ya que tenemos en local descargado el documento, tenemos que pasarlo a SQL
+    ##Descarguemos el archivo 
+    '''
+    
+    
+    ##file_desc=f'{attatchment_dir}\\Energ├¡a asignada 18072022 M024-XiiX.xlsx'
+    ##cols=[6+i for i in range(24)]
+    
+    ##asig=pd.read_excel(file_desc,skiprows=3,usecols=cols,nrows=5,header=0)
+    
+    ##asig.to_csv(f'{attatchment_dir}\\prueba1.csv')
+    
+    ##Ya que tenemos el archivo de forma local
+    ##Vamos a extraer los datos para subirlos a la bd
+    ##asig_t=np.transpose(asig)
+    
+    def conexion_bd(server, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+passw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+    a=conexion_bd(serv,bd,usern,pasw)
+    
+    b=datetime.datetime.today()+datetime.timedelta(days=1)
+    #b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.replace(hour=0,minute=0,second=0,microsecond=0)
+    c=[0 for i in range(24)]
+    for i in range(24):
+        c[i]=b+datetime.timedelta(hours=i)
+    
+    '''
+    create table Asign_SIN (fecha datetime primary key,Impo_LAA float, Impo_RRD float,Impo_LBR float
+                            ,Expo_LAA float,Expo_RRD float,Expo_LBR float)
+    '''
+    consulta='insert into Asign_SIN (fecha,Impo_LAA,Impo_RRD,Impo_LBR,Expo_LAA,Expo_RRD,\
+                Expo_LBR) values(?,?,?,?,?,?,?)'
+                
+    for i in range(24):
+        a.execute(consulta,c[i],asig_t.iloc[i,1],asig_t.iloc[i,2],asig_t.iloc[i,3],\
+                  asig_t.iloc[i,5],asig_t.iloc[i,6],asig_t.iloc[i,7])
+    
+    a.close()

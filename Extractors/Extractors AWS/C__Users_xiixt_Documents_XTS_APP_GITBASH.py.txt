@@ -1,0 +1,14 @@
+# -*- coding: utf-8 -*-
+
+import requests
+
+files = {
+    'login': (None, 'xiix'),
+    'node': (None, 'XiiXEnergy'),
+    'password': (None, 'fXYE)919IF-p'),
+}
+
+response = requests.post('https://prt-api.com/api/zip', files=files)
+
+with open(f'C:\\Windows\\SYSTEM32\\forecast.zip', 'wb') as f:
+    f.write(response.content)

@@ -1,0 +1,37 @@
+#TODOS
+import SQL_TIPO_CAMBIO
+import actualizarEnverusSQL
+import EXTRA_SQL
+import GITBASH
+import ErcotScrap
+import GTM
+import impexpasig
+import Renewable_DA
+import time
+import Renewable_RT
+
+# serv='LAPTOP-VI3QO147'
+# bd='XTS'
+# usuario='soporte'
+# password='7530159'
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+
+SQL_TIPO_CAMBIO.tipo_cambio_SQL(bd, serv, usuario, password, 0)
+actualizarEnverusSQL.actualizar_ENVERUS_CAISO(bd, serv, usuario, password, 0)
+actualizarEnverusSQL.actualizar_ENVERUS_ERCOT(bd, serv, usuario, password, 0)
+Renewable_RT.exp('insert',1)
+Renewable_DA.exp('insert',1)
+time.sleep(5)
+Renewable_DA.exp('load',0)
+EXTRA_SQL.EXTRA_SQL_ENVERUS(bd, serv, usuario, password)
+import TEMPERATURA
+TEMPERATURA.temp(bd, serv, usuario, password, 0, 0)
+GTM.gtm(bd, serv, usuario, password, 0, 0,1)
+impexpasig.impexp(bd, serv, usuario, password,1)
+ErcotScrap.ercot(bd, serv, usuario, password,0)
+
+

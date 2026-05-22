@@ -1,0 +1,210 @@
+import numpy as np
+import pandas as pd
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import lxml
+import urllib.request
+import shutil
+import pyodbc
+import datetime
+
+
+ 
+crear=0
+accion=0
+ffecha=0
+#Para acci├│n: actualizar = 1 , insertar=0
+#Para fecha: hoy=0 , d├¡as anteriores=1
+
+
+def mesf(fecha):
+    if fecha=='01':
+        mes='ENERO'
+    elif fecha=='02':
+        mes='FEBRERO'
+    elif fecha=='03': 
+        mes='MARZO'
+    elif fecha=='04':
+        mes='ABRIL'
+    elif fecha=='05':
+        mes='MAYO'
+    elif fecha=='06':
+        mes='JUNIO'
+    elif fecha== '07':
+        mes='JULIO'
+    elif fecha=='08':
+        mes='AGOSTO'
+    elif fecha=='09':
+        mes='SEPTIEMBRE'
+    elif fecha=='10':
+        mes='OCTUBRE'
+    elif fecha=='11':
+        mes='NOVIEMBRE'
+    elif fecha=='12':
+        mes='DICIEMBRE'
+    return mes
+
+sistema=['SIN','BCA']
+proceso=['MDA','MTR']
+nodo=['07IVY-230','07OMS-230','06LAA-138',	'06RRD-138','09LBR-230']
+# fhoy=datetime.date.today()-timedelta(days=0)
+# fecha=fhoy.strftime('%d-%m-%Y')
+# fstr=fhoy.strftime('%d%m%Y')
+def pml(sist,proc,nd,dias):
+    f=[]
+    hr=[]
+    lpml=[]
+    fhoy=datetime.date.today()-timedelta(days=dias)
+    fii=fhoy.strftime('%d%m%Y')
+    url=f'https://ws01.cenace.gob.mx:8082/SWPML/SIM/{sistema[sist]}/{proceso[proc]}/{nodo[nd]}/{fii[4:]}/{fii[2:4]}/{fii[:2]}/{fii[4:]}/{fii[2:4]}/{fii[:2]}/JSON'
+    res = requests.get(url)
+    res_dict = json.loads(res.content)
+    resultados = res_dict['Resultados']
+    for j in range(24):
+        f.append(resultados[0]['Valores'][j]['fecha'])
+        hr.append(resultados[0]['Valores'][j]['hora'])
+        lpml.append(resultados[0]['Valores'][j]['pml'])          
+    df=pd.DataFrame(zip(f,hr,lpml),columns=['fecha','hora','pml'])
+    print(url)
+    return df
+
+# if crear==1:
+#     consulta='create table GTM$( fecha datetime primary key , IMPO_ASIG int,\
+#         EXPO_ASIG int, LOAD int, LBR float, PPOE float)'
+#     create=a.execute(consulta)
+    
+#     consulta='create table POE$ ( fecha datetime primary key , POE float)'
+#     create=a.execute(consulta)
+    
+#     fi='31-07-2022'
+#     aa=(datetime.strptime(fi,'%d-%m-%Y')).date()
+#     a3=((datetime.now()).date()-aa)/timedelta(days=1)
+#     hoy=(datetime.strptime(fi,'%d-%m-%Y')).date()+datetime.timedelta(days=1)
+#     for i in range(int(a3-1)):
+#         aa=aa+timedelta(days=1)
+#         hoy2=aa.strftime('%d%m%Y')
+#         from datetime import datetime   
+#         aa2=datetime.combine(aa,datetime.min.time())
+#         hoy=hoy+timedelta(days=1)
+#         hoy3=hoy.strftime('%d%m%Y')
+#         b=aa2.replace(hour=0,minute=0)
+#         c=[0 for i in range(24)]
+#         import datetime
+#         for i in range(0,24):
+#             c[i]=b+datetime.timedelta(hours=i)
+#         #IMP-EXP Asignada
+#         url=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/SIN/MDA/{hoy2[4:]}/{hoy2[2:4]}/{hoy2[0:2]}/{hoy2[4:]}/{hoy2[2:4]}/{hoy2[0:2]}/JSON'
+#         res = requests.get(url)
+#         res_dict = json.loads(res.content)
+#         resultados = res_dict['Resultados']
+#         resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+#         df_LBR = resultados_api2[3]
+#         #LOAD
+#         with zipfile.ZipFile(f'G:\\Unidades compartidas\\BBXTS2.0\\FORECAST_ENV\\{hoy3[0:2]}-{hoy3[2:4]}-{hoy3[6:]}-forecast.zip','r') as zip_ref:
+#             zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+#         llbrh=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=1)    #llbrh.iloc[i,1]
+#         lbrh=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=27)    #lbrh.iloc[i,1]
+#         #PPOE
+#         mes=mesf(hoy2[2:4])
+#         planificacion=f'https://www.amm.org.gt/pdfs2/programas_despacho/01_PROGRAMAS_DE_DESPACHO_DIARIO/{hoy2[4:]}/01_PROGRAMAS_DE_DESPACHO_DIARIO/{hoy2[2:4]}_{mes}/WEB{hoy2}.xlsx'
+#         with urllib.request.urlopen(planificacion) as response, open('plan.xlsx','wb')  as out_guat:
+#             shutil.copyfileobj(response,out_guat)
+#         planh=pd.read_excel('plan.xlsx',sheet_name='POE',skiprows=8)    #planh.iloc[i,4]
+#         #Insertar datos
+#         consulta='insert into GTM (fecha, IMPO_ASIG, EXPO_ASIG, LOAD, LBR, PPOE) values(?,?,?,?,?,?)'
+#         for i in range(0,24):
+#             a.execute(consulta,c[i],df_LBR.iloc[i,2],df_LBR.iloc[i,7],llbrh.iloc[i,1],lbrh.iloc[i,1],planh.iloc[i,4])
+
+def gtm(bd,serv,usuario,password,ffecha,accion,dias):
+    conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+    a=conx.cursor()
+    from datetime import datetime
+    for k in range(dias):
+        if ffecha==0:
+            hoy=datetime.today()-timedelta(days=0)
+            # print(hoy)
+            hoy2=hoy.strftime('%d%m%Y')
+            anio=hoy2[4:]
+        if ffecha==1:
+            hoyy=datetime.today()-timedelta(days=1)
+            hoy3=hoyy.strftime('%d%m%Y')
+            
+        #IMP/EXP ASIGNADAS
+        # url=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/SIN/MDA/{anio}/{hoy2[2:4]}/{hoy2[0:2]}/{anio}/{hoy2[2:4]}/{hoy2[0:2]}/JSON'
+        # res = requests.get(url)
+        # res_dict = json.loads(res.content)
+        # resultados = res_dict['Resultados']
+        # resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+        # try:
+        #     df_LBR = resultados_api2[3]
+        # except:
+        #     df_LBR = pd.DataFrame(np.zeros((24, 4)))
+        #PPOE
+        mes=mesf(hoy2[2:4])
+        planificacion=f'https://www.amm.org.gt/pdfs2/programas_despacho/01_PROGRAMAS_DE_DESPACHO_DIARIO/{anio}/01_PROGRAMAS_DE_DESPACHO_DIARIO/{hoy2[2:4]}_{mes}/WEB{hoy2}.xlsx'
+        with urllib.request.urlopen(planificacion) as response, open('plan.xlsx','wb')  as out_guat:
+             shutil.copyfileobj(response,out_guat)
+        planh=pd.read_excel('plan.xlsx',sheet_name='POE',skiprows=8)    #planh.iloc[i,4]
+        b=hoy.replace(hour=0,minute=0,second=0,microsecond=0)
+        c=[0 for i in range(24)]
+        import datetime
+        for i in range(0,24):
+            c[i]=b+datetime.timedelta(hours=i)
+        
+        if ffecha==0:
+            try:
+                import GITBASH
+                with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\forecast.zip', 'r') as zip_ref:
+                    zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+                llbrh=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=1)   #llbrh.iloc[i,1] <-update ; llbrh.iloc[i,2]<-hoy
+                lbrh=pd.read_csv('forecastMexicoAhd09LBR-230.csv',skiprows=27)   #lbrh.iloc[i,1] <-update ; lbrh.iloc[i,2]<-hoy
+                
+                #pml
+                lbrmday=pml(0,0,4,1)
+                lbrmda=pml(0, 0, 4, 0)
+            except:
+                llbrh=pd.DataFrame(np.zeros((50, 4)))
+                lbrh=pd.DataFrame(np.zeros((50, 4)))
+                lbrmday=pd.DataFrame(np.zeros((50,4)))
+                lbrmda=pd.DataFrame(np.zeros((50,4)))
+            
+                
+        if accion==0 and ffecha==0:
+            consulta='insert into GTM (fecha, LOAD, LBR, PPOE) values(?,?,?,?)'
+            for i in range(0,24):
+                a.execute(consulta,c[i],llbrh.iloc[i,2],lbrh.iloc[i,2],int(planh.iloc[i,4]))
+            bb=hoy-timedelta(days=0)
+            bb=bb.replace(hour=0,minute=0,second=0,microsecond=0)
+            c=[0 for i in range(24)]
+            for i in range(0,24):
+                c[i]=bb+datetime.timedelta(hours=i)
+            consulta= 'update GTM set LOAD=?, LBR=? where fecha=?'
+            for i in range(0,24):
+                a.execute(consulta,llbrh.iloc[i,1],lbrh.iloc[i,1],c[i])
+        
+        if accion==0 and ffecha==1:
+            consulta='insert into GTM (fecha, LOAD, LBR, PPOE) values(?,?,?,?)'
+            try:
+                for i in range(0,24):
+                    a.execute(consulta,c[i],llbrh.iloc[i,2],lbrh.iloc[i,2],planh.iloc[i,4])
+            except:
+                print("Datos existentes")
+        
+        if accion==1:
+            consulta='update GTM set LOAD=?, LBR=?, PPOE=? where fecha=?'
+            for i in range(0,24):
+                a.execute(consulta,llbrh.iloc[i,1],lbrh.iloc[i,1],planh.iloc[i,4],c[i])
+
+
+#############################POE###############################################
+    
+    
+    
+            

@@ -1,0 +1,216 @@
+"""
+Facturación CENACE — Estados de Cuenta (ECD)
+Integrado en XTS Morning Portal como página 7_Facturacion.py
+"""
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
+import streamlit as st
+import pandas as pd
+from datetime import date, timedelta
+import base64 as _b64
+
+# ── CSS ───────────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+    header, [data-testid="stHeader"], [data-testid="stToolbar"],
+    [data-testid="stDecoration"], footer, #MainMenu { display: none !important; }
+    html, body, .stApp { background-color: #1a1e2e !important; }
+    .block-container { padding-top: 1.2rem !important; max-width: 100% !important; background-color: #1a1e2e !important; }
+    html, body, [class*="css"] { color: #c0c4cc !important; font-family: 'Segoe UI', 'Consolas', monospace; }
+    h1 { color: #00d4e8 !important; font-size: 1.4rem !important; font-weight: 700 !important;
+         letter-spacing: 1.5px !important; text-transform: uppercase !important;
+         border-bottom: 1px solid #2d3350 !important; padding-bottom: 0.5rem !important; }
+    h2, h3 { color: #c0c4cc !important; font-size: 0.95rem !important;
+              letter-spacing: 1px !important; text-transform: uppercase !important; }
+    [data-testid="stSidebar"] { background-color: #12151f !important; border-right: 1px solid #2d3350 !important; }
+    [data-testid="stMetricValue"] { color: #00d4e8 !important; font-size: 1.4rem !important; font-weight: 700 !important; }
+    [data-testid="stMetricLabel"] { color: #5a6280 !important; font-size: 0.72rem !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
+    .cuenta-badge {
+        display: inline-block; padding: 3px 8px; border-radius: 3px;
+        font-size: 0.7rem; font-weight: 600; margin: 2px;
+        background: #0d2a1e; color: #34d399; border: 1px solid #34d399;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+def _xts_logo_uri(h=33):
+    w = int(h * 2.45)
+    svg = (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg">'
+           '<defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="0%">'
+           '<stop offset="0%" stop-color="#00eed8"/><stop offset="40%" stop-color="#008888"/>'
+           '<stop offset="100%" stop-color="#1c2b58"/></linearGradient></defs>'
+           f'<text x="1" y="{int(h*0.9)}" font-family="Arial Black,sans-serif" '
+           f'font-weight="900" font-size="{h}" letter-spacing="-2" fill="url(#g)">XTS</text></svg>')
+    enc = _b64.b64encode(svg.encode()).decode()
+    return f"data:image/svg+xml;base64,{enc}"
+
+with st.sidebar:
+    st.markdown(
+        f"<div style='text-align:center;padding:14px 0 4px 0;'>"
+        f"<img src='{_xts_logo_uri(33)}' style='height:33px;display:block;margin:0 auto;'/>"
+        f"<div style='color:#4a5478;font-size:0.6rem;letter-spacing:2.5px;text-transform:uppercase;"
+        f"font-family:Segoe UI,sans-serif;margin-top:6px;'>FACTURACIÓN</div></div>",
+        unsafe_allow_html=True,
+    )
+    st.divider()
+    st.markdown("<div style='color:#5a6280;font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;'>Mercados</div>", unsafe_allow_html=True)
+    st.page_link("pages/1_ERCOT.py",     label="⚡ ERCOT Morning")
+    st.page_link("pages/2_CAISO.py",     label="☀️ CAISO Morning")
+    st.page_link("pages/3_CENACE.py",    label="🇲🇽 CENACE Morning")
+    st.page_link("pages/4_Guatemala.py", label="🇬🇹 Guatemala Morning")
+    st.divider()
+    st.markdown("<div style='color:#5a6280;font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;'>Operaciones</div>", unsafe_allow_html=True)
+    st.page_link("pages/5_Ofertas.py",     label="📋 Ofertas Morning")
+    st.page_link("pages/6_Afternoon.py",   label="🌅 Afternoon")
+    st.page_link("pages/7_Trading.py",     label="📊 Trading / P&L")
+    st.page_link("pages/8_Facturacion.py", label="📋 Facturación")
+    st.divider()
+    if st.button("Cerrar Sesión", use_container_width=True, key="fac_logout"):
+        st.session_state.logged_in = False
+        st.session_state.auth = None
+        st.rerun()
+
+# ── Header ────────────────────────────────────────────────────────────────────
+st.markdown("# 📋 Facturación CENACE")
+st.markdown(
+    "<div style='color:#5a6280;font-size:0.8rem;margin-bottom:16px;'>"
+    "Estados de Cuenta CENACE (ECD) · BCA-M024 · SIN-M024 · Liquidaciones y reliquidaciones"
+    "</div>",
+    unsafe_allow_html=True,
+)
+
+# Cuentas disponibles
+_CUENTAS = {
+    "BCA": ["BCA-M024ERO", "BCA-M024ETJ", "BCA-M024IRO", "BCA-M024ITJ"],
+    "SIN": ["SIN-M024ELA", "SIN-M024ERD", "SIN-M024EGT", "SIN-M024IGT"],
+}
+
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+tab_resumen, tab_flujo = st.tabs(["Resumen", "Flujo Semanal"])
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 0 — Resumen Facturación
+# ═══════════════════════════════════════════════════════════════════════════════
+FACTURACION_BASE = r"C:\Users\xiixt\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\XTS R&D\Facturacion"
+PATH_FACTURAS = os.path.join(FACTURACION_BASE, "XiiXFacturas.csv")
+PATH_NOTAS    = os.path.join(FACTURACION_BASE, "XiiXNotas.xlsx")
+
+with tab_resumen:
+    if st.button("🔄 Actualizar resumen", key="btn_refresh_resumen"):
+        st.rerun()
+
+    col_f, col_n = st.columns(2)
+
+    # ── Facturas ──────────────────────────────────────────────────────────────
+    with col_f:
+        st.markdown("### Facturas")
+        try:
+            df_fac = pd.read_csv(PATH_FACTURAS)
+            df_fac.fillna(0, inplace=True)
+
+            cols_fac = [c for c in ["FUF", "Participante", "Periodo ECD", "Fecha Limite de Pago",
+                                     "Subtotal", "Descuento", "IVA", "TOTAL"] if c in df_fac.columns]
+            st.dataframe(df_fac[cols_fac], use_container_width=True, hide_index=True)
+
+            total_fac = df_fac["TOTAL"].sum() if "TOTAL" in df_fac.columns else 0
+            st.markdown(
+                f"<div style='text-align:right;color:#00d4e8;font-size:1.1rem;font-weight:700;"
+                f"margin-top:6px;'>Total Facturas: ${total_fac:,.2f}</div>",
+                unsafe_allow_html=True,
+            )
+        except FileNotFoundError:
+            st.info("XiiXFacturas.csv no encontrado. Corre el Flujo Semanal primero.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+    # ── Notas ─────────────────────────────────────────────────────────────────
+    with col_n:
+        st.markdown("### Notas de Crédito / Débito")
+        try:
+            df_not = pd.read_excel(PATH_NOTAS)
+            df_not.fillna(0, inplace=True)
+
+            cols_not = [c for c in ["FUF", "Tipo", "Participante", "Periodo ECD",
+                                     "Importe Original", "Monto Ajuste", "IVA", "TOTAL"] if c in df_not.columns]
+            st.dataframe(df_not[cols_not], use_container_width=True, hide_index=True)
+
+            total_not = df_not["TOTAL"].sum() if "TOTAL" in df_not.columns else 0
+            st.markdown(
+                f"<div style='text-align:right;color:#FF6B35;font-size:1.1rem;font-weight:700;"
+                f"margin-top:6px;'>Total Notas: ${total_not:,.2f}</div>",
+                unsafe_allow_html=True,
+            )
+        except FileNotFoundError:
+            st.info("XiiXNotas.xlsx no encontrado. Corre el Flujo Semanal primero.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+    # ── Gran total ────────────────────────────────────────────────────────────
+    try:
+        total_fac
+    except NameError:
+        total_fac = 0
+    try:
+        total_not
+    except NameError:
+        total_not = 0
+
+    gran_total = total_fac + total_not
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='background:#1e2130;border:1px solid #2d3350;border-left:4px solid #34d399;"
+        f"border-radius:6px;padding:14px 20px;text-align:right;'>"
+        f"<span style='color:#5a6280;font-size:0.75rem;letter-spacing:1px;text-transform:uppercase;'>Gran Total  (Facturas + Notas)</span><br>"
+        f"<span style='color:#34d399;font-size:1.6rem;font-weight:700;font-family:Consolas,monospace;'>${gran_total:,.2f}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — Flujo Semanal
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_flujo:
+    import subprocess, sys as _sys
+
+    RUN_WEEKLY = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..", "..", "Codigos_facturación", "run_weekly.py"
+    )
+
+    st.markdown(
+        "<div style='color:#5a6280;font-size:0.8rem;margin-bottom:16px;'>"
+        "Abre una terminal y corre el flujo completo de facturación semanal.</div>",
+        unsafe_allow_html=True,
+    )
+
+    PASOS = [
+        "1. Descarga de EDCs",
+        "2. Organizar archivos por fecha",
+        "3. Extraer datos de EDCs",
+        "4. Generar facturas",
+        "5. Generar notas de crédito/débito",
+    ]
+    for p in PASOS:
+        st.markdown(f"<div style='color:#c0c4cc;font-size:0.82rem;margin:2px 0;'>• {p}</div>",
+                    unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if st.button("▶  Correr Flujo Semanal", key="btn_run_weekly"):
+        try:
+            script = os.path.normpath(RUN_WEEKLY)
+            subprocess.Popen(
+                [_sys.executable, script],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                cwd=os.path.dirname(script),
+            )
+            st.success("Terminal abierta — sigue las instrucciones en la ventana de comando.")
+        except Exception as e:
+            st.error(f"Error al abrir terminal: {e}")

@@ -1,0 +1,662 @@
+
+
+import os, glob
+import glob
+import pandas as pd
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+from datetime import timedelta
+os.chdir("G:/Unidades compartidas/BBXTS/MacroBDBBXIIX_V1.0")
+
+
+
+
+
+
+
+
+
+
+#anio_two_digits = anio_two_digits.strftime('%y')
+
+a = " "
+
+
+proceso = "MDA"
+sistema = "BCA"
+nodo = "07IVY-230"
+#sistema2 = "BCA" 
+fecha_ini = f'20{anio}/{mes}/{dia}'
+url = f'https://ws01.cenace.gob.mx:8082/SWPML/SIM/{sistema}/{proceso}/{nodo}/{fecha_ini}/{fecha_ini}/JSON'
+
+
+
+res = requests.get(url)
+print(res.status_code)
+res_dict = json.loads(res.content)
+resultados = res_dict['Resultados']
+resultados_api = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+
+mda_diario = resultados_api[0]
+
+Hour_E =  mda_diario['hora']
+mda_diario_pml = mda_diario['pml']
+
+MDA_BCA_07IVY_230_Timestamp = dia+"/"+mes+"/"+anio
+
+df = pd.DataFrame({
+    'TIME_STAMP' :  MDA_BCA_07IVY_230_Timestamp+"-"+Hour_E,
+    'Date' :  mda_diario['fecha'],
+    'Hour_E' :  mda_diario['hora'],
+    'TOT_Awards_IVY_IMPO' :a,
+    'TOT_Awards_IVY_EXPO' :a,
+    'TOT_Awards_OMS_IMPO' :a,
+    'TOT_Awards_OMS_EXPO' :a,
+    'BCA_EXCE' :a,
+    'BCA_DEFI' :a,
+    'LD_MX' :a,
+    'LD_CA' :a,
+    'SOL_CA' :a,
+    'PML_MDA_IVY' :mda_diario_pml,
+    'PML_MDA_OMS' :a,
+    'PML_MTR_IVY' :a,
+    'PML_MTR_OMS' :a,
+    'DA_ROA' :a,
+    'DA_TJI' :a,
+    'FMM_ROA' :a,
+    'FMM_TJI' :a,
+    'AT_IMP_IVY_MW_T1' :a,
+    'AT_IMP_IVY_PRICE_T1' :a,
+    'AT_IMP_IVY_MW_T2' :a,
+    'AT_IMP_IVY_PRICE_T2' :a,
+    'AT_IMP_IVY_MW_T3' :a,
+    'AT_IMP_IVY_PRICE_T3' :a,
+    'AT_EXP_IVY_MW_T1' :a,
+    'AT_EXP_IVY_PRICE_T1' :a,
+    'AT_EXP_IVY_MW_T2' :a,
+    'AT_EXP_IVY_PRICE_T2' :a,
+    'AT_EXP_IVY_MW_T3' :a,
+    'AT_EXP_IVY_PRICE_T3' :a,
+    'AT_IMP_OMS_MW_T1' :a,
+    'AT_IMP_OMS_PRICE_T1' :a,
+    'AT_IMP_OMS_MW_T2' :a,
+    'AT_IMP_OMS_PRICE_T2' :a,
+    'AT_IMP_OMS_MW_T3' :a,
+    'AT_IMP_OMS_PRICE_T3' :a,
+    'AT_EXP_OMS_MW_T1' :a,
+    'AT_EXP_OMS_PRICE_T1' :a,
+    'AT_EXP_OMS_MW_T2' :a,
+    'AT_EXP_OMS_PRICE_T2' :a,
+    'AT_EXP_OMS_MW_T3' :a,
+    'AT_EXP_OMS_PRICE_T3' :a,
+    'AW_IMP_IVY' :a,
+    'AW_IMP_OMS' :a,
+    'AW_EXP_IVY' :a,
+    'AW_EXP_OMS' :a,
+    'AVG_P_IMP_IVY' :a,
+    'AVG_P_IMP_OMS' :a,
+    'AVG_P_EXP_IVY' :a,
+    'AVG_P_EXP_OMS' :a,
+})
+
+nombre_archivo_mda_ivy = f'MDA_BCA_07IVY_230_{dia}_{mes}_{anio}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico_MDA_BCA_07IVY_230\\{nombre_archivo_mda_ivy}'
+pd.DataFrame.to_csv(df, path_exp)
+
+fecha_actual_collector = fecha_inicio_collector
+print(fecha_actual_collector)
+
+nombre_archivo_mtr = f'MDA_BCA_07IVY_230_{dia}_{mes}_{anio}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0\\{nombre_archivo_mtr}'
+pd.DataFrame.to_csv(df, path_exp)
+
+print("lista la data diaria MDA_BCA_07IVY_230")
+
+#-----------------------------------------------------------------------------
+
+
+proceso = "MTR"
+sistema = "BCA"
+nodo = "07IVY-230"
+#sistema2 = "BCA" 
+fecha_ini = f'20{anio_mtr}/{mes_mtr}/{dia_mtr}'
+url = f'https://ws01.cenace.gob.mx:8082/SWPML/SIM/{sistema}/{proceso}/{nodo}/{fecha_ini}/{fecha_ini}/JSON'
+
+
+
+res = requests.get(url)
+print(res.status_code)
+res_dict = json.loads(res.content)
+resultados = res_dict['Resultados']
+resultados_api = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+
+mtr_diario = resultados_api[0]
+
+Hour_E =  mtr_diario['hora']
+mtr_diario_pml = mtr_diario['pml']
+
+MTR_BCA_07IVY_230_Timestamp = dia_mtr+"/"+mes_mtr+"/"+anio_mtr
+
+df5 = pd.DataFrame({
+    'TIME_STAMP' :  MTR_BCA_07IVY_230_Timestamp+"-"+Hour_E,
+    'Date' :  mtr_diario['fecha'],
+    'Hour_E' :  mtr_diario['hora'],
+    'TOT_Awards_IVY_IMPO' :a,
+    'TOT_Awards_IVY_EXPO' :a,
+    'TOT_Awards_OMS_IMPO' :a,
+    'TOT_Awards_OMS_EXPO' :a,
+    'BCA_EXCE' :a,
+    'BCA_DEFI' :a,
+    'LD_MX' :a,
+    'LD_CA' :a,
+    'SOL_CA' :a,
+    'PML_MDA_IVY' :a,
+    'PML_MDA_OMS' :a,
+    'PML_MTR_IVY' :mtr_diario_pml,
+    'PML_MTR_OMS' :a,
+    'DA_ROA' :a,
+    'DA_TJI' :a,
+    'FMM_ROA' :a,
+    'FMM_TJI' :a,
+    'AT_IMP_IVY_MW_T1' :a,
+    'AT_IMP_IVY_PRICE_T1' :a,
+    'AT_IMP_IVY_MW_T2' :a,
+    'AT_IMP_IVY_PRICE_T2' :a,
+    'AT_IMP_IVY_MW_T3' :a,
+    'AT_IMP_IVY_PRICE_T3' :a,
+    'AT_EXP_IVY_MW_T1' :a,
+    'AT_EXP_IVY_PRICE_T1' :a,
+    'AT_EXP_IVY_MW_T2' :a,
+    'AT_EXP_IVY_PRICE_T2' :a,
+    'AT_EXP_IVY_MW_T3' :a,
+    'AT_EXP_IVY_PRICE_T3' :a,
+    'AT_IMP_OMS_MW_T1' :a,
+    'AT_IMP_OMS_PRICE_T1' :a,
+    'AT_IMP_OMS_MW_T2' :a,
+    'AT_IMP_OMS_PRICE_T2' :a,
+    'AT_IMP_OMS_MW_T3' :a,
+    'AT_IMP_OMS_PRICE_T3' :a,
+    'AT_EXP_OMS_MW_T1' :a,
+    'AT_EXP_OMS_PRICE_T1' :a,
+    'AT_EXP_OMS_MW_T2' :a,
+    'AT_EXP_OMS_PRICE_T2' :a,
+    'AT_EXP_OMS_MW_T3' :a,
+    'AT_EXP_OMS_PRICE_T3' :a,
+    'AW_IMP_IVY' :a,
+    'AW_IMP_OMS' :a,
+    'AW_EXP_IVY' :a,
+    'AW_EXP_OMS' :a,
+    'AVG_P_IMP_IVY' :a,
+    'AVG_P_IMP_OMS' :a,
+    'AVG_P_EXP_IVY' :a,
+    'AVG_P_EXP_OMS' :a,
+})
+
+nombre_archivo_mtr_ivy = f'MTR_BCA_07IVY_230_{dia_mtr}_{mes_mtr}_{anio_mtr}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico_MTR_BCA_07IVY_230\\{nombre_archivo_mtr_ivy}'
+pd.DataFrame.to_csv(df, path_exp)
+
+fecha_actual_collector = fecha_inicio_collector
+print(fecha_actual_collector)
+
+nombre_archivo_mtr_ivi1 = f'MTR_BCA_07IVY_230_{dia_mtr}_{mes_mtr}_{anio_mtr}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0\\{nombre_archivo_mtr_ivi1}'
+pd.DataFrame.to_csv(df5, path_exp)
+
+print("lista la data diaria MTR_BCA_07IVY_230")
+
+
+
+
+
+
+#----------------------------------------------------------------------------
+
+
+
+proceso = "MDA"
+sistema = "BCA"
+nodo = "07OMS-230"
+#sistema2 = "BCA" 
+fecha_ini = f'20{anio}/{mes}/{dia}'
+url = f'https://ws01.cenace.gob.mx:8082/SWPML/SIM/{sistema}/{proceso}/{nodo}/{fecha_ini}/{fecha_ini}/JSON'
+
+
+
+res = requests.get(url)
+print(res.status_code)
+res_dict = json.loads(res.content)
+resultados = res_dict['Resultados']
+resultados_api = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+
+mda_diario_oms = resultados_api[0]
+
+Hour_E =  mda_diario_oms['hora']
+mda_diario_pml = mda_diario_oms['pml']
+
+MDA_BCA_07OMS_230_Timestamp = dia+"/"+mes+"/"+anio
+
+df6 = pd.DataFrame({
+    'TIME_STAMP' :  MDA_BCA_07OMS_230_Timestamp+"-"+Hour_E,
+    'Date' :  mda_diario_oms['fecha'],
+    'Hour_E' :  mda_diario_oms['hora'],
+    'TOT_Awards_IVY_IMPO' :a,
+    'TOT_Awards_IVY_EXPO' :a,
+    'TOT_Awards_OMS_IMPO' :a,
+    'TOT_Awards_OMS_EXPO' :a,
+    'BCA_EXCE' :a,
+    'BCA_DEFI' :a,
+    'LD_MX' :a,
+    'LD_CA' :a,
+    'SOL_CA' :a,
+    'PML_MDA_IVY' :a,
+    'PML_MDA_OMS' :mda_diario_pml,
+    'PML_MTR_IVY' :a,
+    'PML_MTR_OMS' :a,
+    'DA_ROA' :a,
+    'DA_TJI' :a,
+    'FMM_ROA' :a,
+    'FMM_TJI' :a,
+    'AT_IMP_IVY_MW_T1' :a,
+    'AT_IMP_IVY_PRICE_T1' :a,
+    'AT_IMP_IVY_MW_T2' :a,
+    'AT_IMP_IVY_PRICE_T2' :a,
+    'AT_IMP_IVY_MW_T3' :a,
+    'AT_IMP_IVY_PRICE_T3' :a,
+    'AT_EXP_IVY_MW_T1' :a,
+    'AT_EXP_IVY_PRICE_T1' :a,
+    'AT_EXP_IVY_MW_T2' :a,
+    'AT_EXP_IVY_PRICE_T2' :a,
+    'AT_EXP_IVY_MW_T3' :a,
+    'AT_EXP_IVY_PRICE_T3' :a,
+    'AT_IMP_OMS_MW_T1' :a,
+    'AT_IMP_OMS_PRICE_T1' :a,
+    'AT_IMP_OMS_MW_T2' :a,
+    'AT_IMP_OMS_PRICE_T2' :a,
+    'AT_IMP_OMS_MW_T3' :a,
+    'AT_IMP_OMS_PRICE_T3' :a,
+    'AT_EXP_OMS_MW_T1' :a,
+    'AT_EXP_OMS_PRICE_T1' :a,
+    'AT_EXP_OMS_MW_T2' :a,
+    'AT_EXP_OMS_PRICE_T2' :a,
+    'AT_EXP_OMS_MW_T3' :a,
+    'AT_EXP_OMS_PRICE_T3' :a,
+    'AW_IMP_IVY' :a,
+    'AW_IMP_OMS' :a,
+    'AW_EXP_IVY' :a,
+    'AW_EXP_OMS' :a,
+    'AVG_P_IMP_IVY' :a,
+    'AVG_P_IMP_OMS' :a,
+    'AVG_P_EXP_IVY' :a,
+    'AVG_P_EXP_OMS' :a,
+})
+
+nombre_archivo_mda_ivy = f'MDA_BCA_07OMS_230_{dia}_{mes}_{anio}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico_MDA_BCA_07OMS_230\\{nombre_archivo_mda_ivy}'
+pd.DataFrame.to_csv(df6, path_exp)
+
+fecha_actual_collector = fecha_inicio_collector
+print("La data del MDA-IVY es de:")
+print(fecha_actual_collector)
+
+nombre_archivo_mtr = f'MDA_BCA_07OMS_230_{dia}_{mes}_{anio}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0\\{nombre_archivo_mtr}'
+pd.DataFrame.to_csv(df6, path_exp)
+
+print("lista la data diaria MDA_BCA_07OMS_230")
+
+#-----------------------------------------------------------------------------
+
+
+
+proceso = "MTR"
+sistema = "BCA"
+nodo = "07OMS-230"
+#sistema2 = "BCA" 
+fecha_ini = f'20{anio_mtr}/{mes_mtr}/{dia_mtr}'
+url = f'https://ws01.cenace.gob.mx:8082/SWPML/SIM/{sistema}/{proceso}/{nodo}/{fecha_ini}/{fecha_ini}/JSON'
+
+
+
+res = requests.get(url)
+print(res.status_code)
+res_dict = json.loads(res.content)
+resultados = res_dict['Resultados']
+resultados_api = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))] #lista de data frames
+
+mtr_diario = resultados_api[0]
+
+Hour_E =  mtr_diario['hora']
+mtr_diario_pml = mtr_diario['pml']
+
+MTR_BCA_07OMS_230_Timestamp = dia_mtr+"/"+mes_mtr+"/"+anio_mtr
+
+df7 = pd.DataFrame({
+    'TIME_STAMP' :  MTR_BCA_07OMS_230_Timestamp+"-"+Hour_E,
+    'Date' :  mtr_diario['fecha'],
+    'Hour_E' :  mtr_diario['hora'],
+    'TOT_Awards_IVY_IMPO' :a,
+    'TOT_Awards_IVY_EXPO' :a,
+    'TOT_Awards_OMS_IMPO' :a,
+    'TOT_Awards_OMS_EXPO' :a,
+    'BCA_EXCE' :a,
+    'BCA_DEFI' :a,
+    'LD_MX' :a,
+    'LD_CA' :a,
+    'SOL_CA' :a,
+    'PML_MDA_IVY' :a,
+    'PML_MDA_OMS' :a,
+    'PML_MTR_IVY' :a,
+    'PML_MTR_OMS' :mtr_diario_pml,
+    'DA_ROA' :a,
+    'DA_TJI' :a,
+    'FMM_ROA' :a,
+    'FMM_TJI' :a,
+    'AT_IMP_IVY_MW_T1' :a,
+    'AT_IMP_IVY_PRICE_T1' :a,
+    'AT_IMP_IVY_MW_T2' :a,
+    'AT_IMP_IVY_PRICE_T2' :a,
+    'AT_IMP_IVY_MW_T3' :a,
+    'AT_IMP_IVY_PRICE_T3' :a,
+    'AT_EXP_IVY_MW_T1' :a,
+    'AT_EXP_IVY_PRICE_T1' :a,
+    'AT_EXP_IVY_MW_T2' :a,
+    'AT_EXP_IVY_PRICE_T2' :a,
+    'AT_EXP_IVY_MW_T3' :a,
+    'AT_EXP_IVY_PRICE_T3' :a,
+    'AT_IMP_OMS_MW_T1' :a,
+    'AT_IMP_OMS_PRICE_T1' :a,
+    'AT_IMP_OMS_MW_T2' :a,
+    'AT_IMP_OMS_PRICE_T2' :a,
+    'AT_IMP_OMS_MW_T3' :a,
+    'AT_IMP_OMS_PRICE_T3' :a,
+    'AT_EXP_OMS_MW_T1' :a,
+    'AT_EXP_OMS_PRICE_T1' :a,
+    'AT_EXP_OMS_MW_T2' :a,
+    'AT_EXP_OMS_PRICE_T2' :a,
+    'AT_EXP_OMS_MW_T3' :a,
+    'AT_EXP_OMS_PRICE_T3' :a,
+    'AW_IMP_IVY' :a,
+    'AW_IMP_OMS' :a,
+    'AW_EXP_IVY' :a,
+    'AW_EXP_OMS' :a,
+    'AVG_P_IMP_IVY' :a,
+    'AVG_P_IMP_OMS' :a,
+    'AVG_P_EXP_IVY' :a,
+    'AVG_P_EXP_OMS' :a,
+})
+
+nombre_archivo_mtr_oms = f'MTR_BCA_07OMS_230_{dia_mtr}_{mes_mtr}_{anio_mtr}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico_MTR_BCA_07OMS_230\\{nombre_archivo_mtr_oms}'
+pd.DataFrame.to_csv(df7, path_exp)
+
+fecha_actual_collector = fecha_inicio_collector
+print(fecha_actual_collector)
+
+nombre_archivo_mtr_ivi1 = f'MTR_BCA_07OMS_230_{dia_mtr}_{mes_mtr}_{anio_mtr}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0\\{nombre_archivo_mtr_ivi1}'
+pd.DataFrame.to_csv(df7, path_exp)
+
+print("lista la data diaria MTR_BCA_07OMS_230")
+
+
+
+
+
+
+
+
+
+
+#----------------------------------------------------------------------
+
+
+#lecture of xts morning bd-1 
+
+
+bd_menos_un_dia = pd.read_excel("G:\\Unidades compartidas\\Morning\\XTS-CAISO MORNING2.xlsx", sheet_name='BD -1')
+
+
+
+
+df2 = pd.DataFrame({
+    'TIME_STAMP' :  bd_menos_un_dia['TIME_STAMP'],
+    'Date' :   bd_menos_un_dia['Date'],
+    'Hour_E' :  bd_menos_un_dia['Hour_E'],
+    'TOT_Awards_IVY_IMPO' :a,
+    'TOT_Awards_IVY_EXPO' :a,
+    'TOT_Awards_OMS_IMPO' :a,
+    'TOT_Awards_OMS_EXPO' :a,
+    'BCA_EXCE' :a,
+    'BCA_DEFI' :a,
+    'LD_MX' :bd_menos_un_dia['LD_MX'],
+    'LD_CA' :bd_menos_un_dia['LD_CA'],
+    'SOL_CA' :bd_menos_un_dia['SOL_CA'],
+    'PML_MDA_IVY' :a,
+    'PML_MDA_OMS' :a,
+    'PML_MTR_IVY' :a,
+    'PML_MTR_OMS' :a,
+    'DA_ROA' :a,
+    'DA_TJI' :a,
+    'FMM_ROA' :bd_menos_un_dia['FMM_ROA'],
+    'FMM_TJI' :bd_menos_un_dia['FMM_TJI'],
+    'AT_IMP_IVY_MW_T1' :a,
+    'AT_IMP_IVY_PRICE_T1' :a,
+    'AT_IMP_IVY_MW_T2' :a,
+    'AT_IMP_IVY_PRICE_T2' :a,
+    'AT_IMP_IVY_MW_T3' :a,
+    'AT_IMP_IVY_PRICE_T3' :a,
+    'AT_EXP_IVY_MW_T1' :a,
+    'AT_EXP_IVY_PRICE_T1' :a,
+    'AT_EXP_IVY_MW_T2' :a,
+    'AT_EXP_IVY_PRICE_T2' :a,
+    'AT_EXP_IVY_MW_T3' :a,
+    'AT_EXP_IVY_PRICE_T3' :a,
+    'AT_IMP_OMS_MW_T1' :a,
+    'AT_IMP_OMS_PRICE_T1' :a,
+    'AT_IMP_OMS_MW_T2' :a,
+    'AT_IMP_OMS_PRICE_T2' :a,
+    'AT_IMP_OMS_MW_T3' :a,
+    'AT_IMP_OMS_PRICE_T3' :a,
+    'AT_EXP_OMS_MW_T1' :a,
+    'AT_EXP_OMS_PRICE_T1' :a,
+    'AT_EXP_OMS_MW_T2' :a,
+    'AT_EXP_OMS_PRICE_T2' :a,
+    'AT_EXP_OMS_MW_T3' :a,
+    'AT_EXP_OMS_PRICE_T3' :a,
+    'AW_IMP_IVY' :a,
+    'AW_IMP_OMS' :a,
+    'AW_EXP_IVY' :a,
+    'AW_EXP_OMS' :a,
+    'AVG_P_IMP_IVY' :a,
+    'AVG_P_IMP_OMS' :a,
+    'AVG_P_EXP_IVY' :a,
+    'AVG_P_EXP_OMS' :a,
+})
+
+nombre_archivo_bd_menos_uno = f'BD_MENOS_UNO_{dia_ayer}_{mes_ayer}_{anio_ayer}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico XTS-Morning\\{nombre_archivo_bd_menos_uno}'
+pd.DataFrame.to_csv(df2, path_exp)
+
+nombre_archivo_bd_menos_uno_2 = f'BD_MENOS_UNO_{dia_ayer}_{mes_ayer}_{anio_ayer}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0\\{nombre_archivo_bd_menos_uno_2}'
+pd.DataFrame.to_csv(df2, path_exp)
+
+print("lista la data diaria BD_MENOS_UNO")
+
+
+
+#-------------------------------------------------------------------
+#lecture of xts morning bd-1
+
+bd_dia_actual = pd.read_excel("G:\\Unidades compartidas\\Morning\\XTS-CAISO MORNING2.xlsx", sheet_name='BD')
+
+
+
+df3 = pd.DataFrame({
+    'TIME_STAMP' :  bd_dia_actual['TIME_STAMP'],
+    'Date' :   bd_dia_actual['Date'],
+    'Hour_E' :  bd_dia_actual['Hour_E'],
+    'TOT_Awards_IVY_IMPO' :bd_dia_actual['TOT_Awards_IVY_IMPO'],
+    'TOT_Awards_IVY_EXPO' :bd_dia_actual['TOT_Awards_IVY_EXPO'],
+    'TOT_Awards_OMS_IMPO' :bd_dia_actual['TOT_Awards_OMS_IMPO'],
+    'TOT_Awards_OMS_EXPO' :bd_dia_actual['TOT_Awards_OMS_EXPO'],
+    'BCA_EXCE' :a,
+    'BCA_DEFI' :a,
+    'LD_MX' :a,
+    'LD_CA' :a,
+    'SOL_CA' :a,
+    'PML_MDA_IVY' :bd_dia_actual['PML_MDA_IVY'],
+    'PML_MDA_OMS' :bd_dia_actual['PML_MDA_OMS'],
+    'PML_MTR_IVY' :a,
+    'PML_MTR_OMS' :a,
+    'DA_ROA' :bd_dia_actual['DA_ROA'],
+    'DA_TJI' :bd_dia_actual['DA_TJI'],
+    'FMM_ROA' :a,
+    'FMM_TJI' :a,
+    'AT_IMP_IVY_MW_T1' :a,
+    'AT_IMP_IVY_PRICE_T1' :a,
+    'AT_IMP_IVY_MW_T2' :a,
+    'AT_IMP_IVY_PRICE_T2' :a,
+    'AT_IMP_IVY_MW_T3' :a,
+    'AT_IMP_IVY_PRICE_T3' :a,
+    'AT_EXP_IVY_MW_T1' :a,
+    'AT_EXP_IVY_PRICE_T1' :a,
+    'AT_EXP_IVY_MW_T2' :a,
+    'AT_EXP_IVY_PRICE_T2' :a,
+    'AT_EXP_IVY_MW_T3' :a,
+    'AT_EXP_IVY_PRICE_T3' :a,
+    'AT_IMP_OMS_MW_T1' :a,
+    'AT_IMP_OMS_PRICE_T1' :a,
+    'AT_IMP_OMS_MW_T2' :a,
+    'AT_IMP_OMS_PRICE_T2' :a,
+    'AT_IMP_OMS_MW_T3' :a,
+    'AT_IMP_OMS_PRICE_T3' :a,
+    'AT_EXP_OMS_MW_T1' :a,
+    'AT_EXP_OMS_PRICE_T1' :a,
+    'AT_EXP_OMS_MW_T2' :a,
+    'AT_EXP_OMS_PRICE_T2' :a,
+    'AT_EXP_OMS_MW_T3' :a,
+    'AT_EXP_OMS_PRICE_T3' :a,
+    'AW_IMP_IVY' :a,
+    'AW_IMP_OMS' :a,
+    'AW_EXP_IVY' :a,
+    'AW_EXP_OMS' :a,
+    'AVG_P_IMP_IVY' :a,
+    'AVG_P_IMP_OMS' :a,
+    'AVG_P_EXP_IVY' :a,
+    'AVG_P_EXP_OMS' :a,
+})
+
+nombre_archivo_hoy = f'BD_DIA_ACTUAL_{dia_hoy}_{mes_hoy}_{anio_hoy}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico XTS-Morning\\{nombre_archivo_hoy}'
+pd.DataFrame.to_csv(df3, path_exp)
+
+nombre_archivo_hoy_2 = f'BD_DIA_ACTUAL_{dia_hoy}_{mes_hoy}_{anio_hoy}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0\\{nombre_archivo_hoy_2}'
+pd.DataFrame.to_csv(df3, path_exp)
+
+print("lista la data diaria BD_DIA_ACTUAL")
+
+#-------------------------------------------------------------------
+#lecture of xts morning bd+1
+
+bd_mas_un_dia = pd.read_excel("G:\\Unidades compartidas\\Morning\\XTS-CAISO MORNING2.xlsx", sheet_name='BD +1')
+
+
+
+df4 = pd.DataFrame({
+    'TIME_STAMP' :  bd_mas_un_dia['TIME_STAMP'],
+    'Date' :   bd_mas_un_dia['Date'],
+    'Hour_E' :  bd_mas_un_dia['Hour_E'],
+    'TOT_Awards_IVY_IMPO' :a,
+    'TOT_Awards_IVY_EXPO' :a,
+    'TOT_Awards_OMS_IMPO' :a,
+    'TOT_Awards_OMS_EXPO' :a,
+    'BCA_EXCE' :bd_mas_un_dia['BCA_EXCE'],
+    'BCA_DEFI' :bd_mas_un_dia['BCA_DEFI'],
+    'LD_MX' :a,
+    'LD_CA' :a,
+    'SOL_CA' :a,
+    'PML_MDA_IVY' :a,
+    'PML_MDA_OMS' :a,
+    'PML_MTR_IVY' :a,
+    'PML_MTR_OMS' :a,
+    'DA_ROA' :a,
+    'DA_TJI' :a,
+    'FMM_ROA' :a,
+    'FMM_TJI' :a,
+    'AT_IMP_IVY_MW_T1':bd_mas_un_dia['AT_IMP_IVY_MW_T1'],
+    'AT_IMP_IVY_PRICE_T1':bd_mas_un_dia['AT_IMP_IVY_PRICE_T1'],
+    'AT_IMP_IVY_MW_T2':bd_mas_un_dia['AT_IMP_IVY_MW_T2'],
+    'AT_IMP_IVY_PRICE_T2':bd_mas_un_dia['AT_IMP_IVY_PRICE_T2'],
+    'AT_IMP_IVY_MW_T3':bd_mas_un_dia['AT_IMP_IVY_MW_T3'],
+    'AT_IMP_IVY_PRICE_T3':bd_mas_un_dia['AT_IMP_IVY_PRICE_T3'],
+    'AT_EXP_IVY_MW_T1':bd_mas_un_dia['AT_EXP_IVY_MW_T1'],
+    'AT_EXP_IVY_PRICE_T1':bd_mas_un_dia['AT_EXP_IVY_PRICE_T1'],
+    'AT_EXP_IVY_MW_T2':bd_mas_un_dia['AT_EXP_IVY_MW_T2'],
+    'AT_EXP_IVY_PRICE_T2':bd_mas_un_dia['AT_EXP_IVY_PRICE_T2'],
+    'AT_EXP_IVY_MW_T3':bd_mas_un_dia['AT_EXP_IVY_MW_T3'],
+    'AT_EXP_IVY_PRICE_T3':bd_mas_un_dia['AT_EXP_IVY_PRICE_T3'],
+    'AT_IMP_OMS_MW_T1':bd_mas_un_dia['AT_IMP_OMS_MW_T1'],
+    'AT_IMP_OMS_PRICE_T1':bd_mas_un_dia['AT_IMP_OMS_PRICE_T1'],
+    'AT_IMP_OMS_MW_T2':bd_mas_un_dia['AT_IMP_OMS_MW_T2'],
+    'AT_IMP_OMS_PRICE_T2':bd_mas_un_dia['AT_IMP_OMS_PRICE_T2'],
+    'AT_IMP_OMS_MW_T3':bd_mas_un_dia['AT_IMP_OMS_MW_T3'],
+    'AT_IMP_OMS_PRICE_T3':bd_mas_un_dia['AT_IMP_OMS_PRICE_T3'],
+    'AT_EXP_OMS_MW_T1':bd_mas_un_dia['AT_EXP_OMS_MW_T1'],
+    'AT_EXP_OMS_PRICE_T1':bd_mas_un_dia['AT_EXP_OMS_PRICE_T1'],
+    'AT_EXP_OMS_MW_T2':bd_mas_un_dia['AT_EXP_OMS_MW_T2'],
+    'AT_EXP_OMS_PRICE_T2':bd_mas_un_dia['AT_EXP_OMS_PRICE_T2'],
+    'AT_EXP_OMS_MW_T3':bd_mas_un_dia['AT_EXP_OMS_MW_T3'],
+    'AT_EXP_OMS_PRICE_T3':bd_mas_un_dia['AT_EXP_OMS_PRICE_T3'],
+    'AW_IMP_IVY' :bd_mas_un_dia['AW_IMP_IVY'],
+    'AW_IMP_OMS' :bd_mas_un_dia['AW_IMP_OMS'],
+    'AW_EXP_IVY' :bd_mas_un_dia['AW_EXP_IVY'],
+    'AW_EXP_OMS' :bd_mas_un_dia['AW_EXP_OMS'],
+    'AVG_P_IMP_IVY' :bd_mas_un_dia['AVG_P_IMP_IVY'],
+    'AVG_P_IMP_OMS' :bd_mas_un_dia['AVG_P_EXP_IVY'],
+    'AVG_P_EXP_IVY' :bd_mas_un_dia['AVG_P_IMP_OMS'],
+    'AVG_P_EXP_OMS' :bd_mas_un_dia['AVG_P_EXP_OMS'],
+})
+
+
+
+nombre_archivo_manana = f'BD_MAS_UNO_{dia_manana}_{mes_manana}_{anio_manana}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\Hist├│rico XTS-Morning\\{nombre_archivo_manana}'
+pd.DataFrame.to_csv(df4, path_exp)
+
+nombre_archivo_manana_2 = f'BD_MAS_UNO_{dia_manana}_{mes_manana}_{anio_manana}.csv'
+path_exp = f'G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0\\{nombre_archivo_manana_2}'
+pd.DataFrame.to_csv(df4, path_exp)
+
+print("lista la data diaria BD_MAS_UNO")
+
+
+
+#-------------------------------------------------------------------
+
+
+
+extension = 'csv'
+all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
+
+#combine all files in the list
+combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames ])
+#export to csv
+combined_csv.to_csv( "G:/Unidades compartidas/BBXTS/BDBBXIIX_V1.0/BDBBXIIX_V1.0.csv", index=False, encoding='utf-8-sig')
+
+
+
+
+
+
+
+
+#files = glob.glob(os.path.join(_data, "G:\\Unidades compartidas\\BBXTS\\MacroBDBBXIIX_V1.0",)
+
+#for file in files:
+#    df8 = pd.read_csv(file)

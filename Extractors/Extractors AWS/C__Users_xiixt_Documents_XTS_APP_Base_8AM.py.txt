@@ -1,0 +1,110 @@
+import subprocess
+
+
+
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("----------------PROCESO BASE INICIADO----------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+
+subprocess.run(["python", "BaseXTS.py"])##############ejecutar proceso a las 8.00AM DIARIO
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("----------------PROCESO BASE FINALIZADO--------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+
+
+import pyodbc
+from datetime import datetime
+
+conn = pyodbc.connect('DRIVER={SQL Server};SERVER=ec2-34-203-113-74.compute-1.amazonaws.com;DATABASE=XTS;UID=sa;PWD=XTS_operations.XiiX')
+
+cursor = conn.cursor()
+
+nombre = 'BaseXTS'
+estatus = 'FINALIZADO'
+fecha_hora = datetime.now()  
+
+cursor.execute("""
+INSERT INTO XTS.dbo.CONTROL_PROCESOS (NOMBRE, ESTATUS, FECHA_HORA)
+VALUES (?, ?, ?)
+""", nombre, estatus, fecha_hora)
+
+conn.commit()
+
+conn.close()
+
+
+
+
+
+
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("------------REGISTRO DE CONTROL INSERTADO------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+print("-----------------------------------------------------")
+
+print("--------------------------------PROCESO Premornings INICIADA")
+subprocess.run(["python", "Premornings.py"])
+print("--------------------------------Premornings FINAlIZADA")
+
+
+import pyodbc
+from datetime import datetime
+
+conn = pyodbc.connect('DRIVER={SQL Server};SERVER=ec2-34-203-113-74.compute-1.amazonaws.com;DATABASE=XTS;UID=sa;PWD=XTSoperations7530159')
+
+cursor = conn.cursor()
+
+nombre2 = 'Premornings'
+estatus2 = 'FINALIZADO'
+fecha_hora2 = datetime.now()  
+
+cursor.execute("""
+INSERT INTO XTS.dbo.CONTROL_PROCESOS (NOMBRE, ESTATUS, FECHA_HORA)
+VALUES (?, ?, ?)
+""", nombre2, estatus2, fecha_hora2)
+
+conn.commit()
+
+conn.close()
+
+
+
+
+
+
+"""
+print("--------------------------------PROCESO MorningE INICIADA")
+subprocess.run(["python", "MorningE.py"])
+print("--------------------------------MorningE FINAlIZADA")
+
+import pyodbc
+from datetime import datetime
+
+conn = pyodbc.connect('DRIVER={SQL Server};SERVER=ec2-34-203-113-74.compute-1.amazonaws.com;DATABASE=XTS;UID=sa;PWD=XTSoperations7530159')
+
+cursor = conn.cursor()
+
+nombre3 = 'MorningE'
+estatus3 = 'FINALIZADO'
+fecha_hora3 = datetime.now()  
+
+cursor.execute("""
+#INSERT INTO XTS.dbo.CONTROL_PROCESOS (NOMBRE, ESTATUS, FECHA_HORA)
+#VALUES (?, ?, ?)
+""", nombre3, estatus3, fecha_hora3)
+
+conn.commit()
+
+conn.close()
+"""

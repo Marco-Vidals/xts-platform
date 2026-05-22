@@ -1,0 +1,151 @@
+from selenium import webdriver
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import urllib.request
+import shutil
+import re
+import os
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+import pytemperature
+import pyodbc
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTS_operations.XiiX'
+
+fhoy=datetime.datetime.today()
+hoy=fhoy.strftime('%x')
+dmas1=fhoy+timedelta(days=1)
+fecha=dmas1.strftime('%x')
+dmenos1=fhoy-timedelta(days=1)
+fmenos=dmenos1.strftime('%x')
+dmenos2=fhoy-timedelta(days=2)
+fm2=dmenos2.strftime('%x')
+nextweek=fhoy+timedelta(days=7)
+nxtwk=nextweek.strftime('%x')
+samedayfmm=fhoy-timedelta(days=6)
+sdfmm=samedayfmm.strftime('%x')
+
+conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+a=conx.cursor()
+    
+def diatable(dia,tabla):
+    dr=dia.replace(hour=0,minute=0,second=0,microsecond=0)
+    d24=dr+timedelta(hours=23)
+    consulta=f"select * from {tabla} where fecha between '{dr}' and '{d24}'"
+    a.execute(consulta)
+    resultado=a.fetchall()
+    return resultado
+def columna(lista,col):
+    l=[]
+    for i in range(24):
+        df=lista[i][col]
+        l.append(df)
+    return l
+tc=diatable(fhoy,'Tipo_Cambio')
+today = datetime.date.today()
+
+driver= webdriver.Firefox()
+time.sleep(random.uniform(4,8))
+driver.get('https://www.cenace.gob.mx/Paginas/SIM/Reportes/CapacidadTransferMDA.aspx')
+bca=driver.find_element('xpath','//select[@id="ContentPlaceHolder1_ddlSistema"]')
+bca.click()
+time.sleep(random.uniform(3,8))
+bca2=driver.find_element('xpath','//option[2]')
+bca2.click()
+time.sleep(random.uniform(3,8))
+filebca=driver.find_element('xpath','//input[@id="ContentPlaceHolder1_gvReportes_imgBtnCSV_0"]')
+filebca.click()
+time.sleep(3)
+driver.close()
+#Capacidad de Transferencia:   
+segundo_str = '00'
+for i in range(65):
+    try:
+        nombre_archivo_BCA = f'Cap Transferencia BCA Periodo 20{fecha[6:]}-{fecha[:2]}-{fecha[3:5]} al 20{nxtwk[6:8]}-{nxtwk[0:2]}-{nxtwk[3:5]} v20{hoy[6:8]} {hoy[0:2]} {hoy[3:5]}_08 55 {segundo_str}.csv'
+        path_lectura_BCA = f'C:\\Users\\Administrator\\Downloads\\{nombre_archivo_BCA}'
+        newcap=os.path.join('C:\\Users\\Administrator\\Downloads\\CapacidadBCA.csv')
+        shutil.move(path_lectura_BCA, newcap)
+        dat_BCA_cap = pd.read_csv(newcap, skiprows = 8)
+    except:
+        #print(nombre_archivo_BCA)
+        segundo_int = int(segundo_str) + 1
+        segundo_str = ("%02d" % segundo_int)
+        if segundo_str=='61':
+            dat_BCA_cap= pd.DataFrame(np.zeros((50, 9)))
+            break
+    else:
+        break
+    
+cap_roa_imp=dat_BCA_cap.iloc[0:24,4]
+cap_roa_exp=dat_BCA_cap.iloc[0:24,8]
+cap_tji_imp=dat_BCA_cap.iloc[24:48,4]
+cap_tji_exp=dat_BCA_cap.iloc[24:48,8]
+capacidad=pd.DataFrame(zip(cap_roa_imp,cap_roa_exp,cap_tji_imp,cap_tji_exp))
+
+#Precios del d├¡a anterior
+operations= f'XIIX-SENA operations for {hoy[0:2]}-{hoy[3:5]}-20{hoy[6:]}-1.xlsx'
+ophoy=f'C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\AGREED TRANSACTIONS\\20{hoy[6:]}\\{hoy[0:2]}\\{operations}'
+oprfile=pd.read_excel(ophoy,skiprows=(4))
+
+df=pd.DataFrame({
+    'CAPACIDAD-IVY-IMPO (N)' : capacidad.iloc[0:24,0],
+    'CAPACIDAD-IVY -EXPO (N)' : capacidad.iloc[0:24,1],
+    'CAPACIDAD-OMS-IMPO  (N)' : capacidad.iloc[0:24,2],
+    'CAPACIDAD-OMS-EXPO  (N)' : capacidad.iloc[0:24,3],
+    'PRICE IVY-ROA EXP' :oprfile.iloc[0:24,4],
+    'PRICE IVY-ROA IMP' :oprfile.iloc[0:24,25],
+    'PRICE OMS-TJI EXP' :oprfile.iloc[0:24,14],
+    'PRICE OMS-TJI IMP' :oprfile.iloc[0:24,33],
+    'Hoy': today,
+    'Tipo de cambio': columna(tc, 1)       
+})
+wb = xw.Book("C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\MORNING\\B_PRE_MORNINGS_CAISO_845_930.xlsx")
+sht1 = wb.sheets['Data']
+sht1.range('A1').value=df
+time.sleep(30)
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+
+
+wb.app.quit()
+
+
+try:
+    conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+    print('Conexi├│n exitosa')
+except:
+    print('No funcion├│ la conexi├│n')
+    
+c=[1 for i in range(24)]
+dt=datetime.datetime.today()
+dt=dt.replace(hour=0,minute=0,second=0,microsecond=0)
+a=conx.cursor()
+
+consulta='update CAPACIDADES set IVY_IMPO=?, IVY_EXPO=?,\
+    OMS_IMPO=?, OMS_EXPO=? where fecha=?'
+try:
+    for i in range(24):
+        c[i]=dt+datetime.timedelta(hours=i)
+        a.execute(consulta,int(df.iloc[i,0]),int(df.iloc[i,1]),int(df.iloc[i,2]),\
+                  int(df.iloc[i,3]),c[i])
+except:
+    print("Datos existentes")
+
+

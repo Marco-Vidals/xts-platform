@@ -1,0 +1,130 @@
+import pandas as pd
+import datetime
+from datetime import timedelta
+import xlwings as xw
+import shutil
+import time
+import numpy as np
+tiempo_inicio = datetime.datetime.now() 
+
+# Fechas para abrir archivos
+fecha = datetime.datetime.now()
+fecha_menos_uno = fecha - timedelta(days = 1)
+fecha_mas_uno = fecha + timedelta(days = 1)
+fecha_fin = (fecha_mas_uno + timedelta(days = 6)) #para capacidades
+fecha_str_ayer = fecha_menos_uno.strftime('%x')
+fecha_str_hoy = fecha.strftime('%x') #mm/dd/aa
+fecha_str_manana = fecha_mas_uno.strftime('%x')
+fecha_str_fin = fecha_fin.strftime('%x')
+anio=fecha.strftime('%Y')
+dia_hoy = fecha_str_hoy[3:5]
+mes_hoy = fecha_str_hoy[0:2]
+anio_hoy = fecha_str_hoy[6:]
+
+anio2 = fecha_str_fin[6:]
+mes2 = fecha_str_fin[0:2]
+dia2 = fecha_str_fin[3:5]
+
+dia_manana = fecha_str_manana[3:5]
+mes_manana = fecha_str_manana[0:2]
+anio_manana = fecha_str_manana[6:]
+
+dia_ayer = fecha_str_ayer[3:5]
+mes_ayer = fecha_str_ayer[0:2]
+anio_ayer = fecha_str_ayer[6:]
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\BCA\\compra_M02407IVY01.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('F14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('H14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('J14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('L14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('N14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('P14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\BCA\\compra_M02407OMS01.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('F14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('H14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('J14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('L14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('N14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('P14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+
+
+
+vtivy=pd.DataFrame(np.zeros((24, 22)))
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\BCA\\venta_M02407IVYIMP.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('G24').options(index=False,header=False).value=vtivy
+
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\BCA\\venta_M02407OMSIMP.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('G24').options(index=False,header=False).value=vtivy
+
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\\AGREED_CAISO_ERCOT.xlsx')
+sht1 = wb.sheets['Morning AGREED TRANSACTIONS']
+agreedc=pd.DataFrame(np.zeros((24,37)))
+sht1.range('C6').options(index=False,header=False).value=agreedc
+sht1.range('C35').options(index=False,header=False).value=agreedc
+
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\SIN\\compra_M02406EAP01-0.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('F14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('H14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('J14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('L14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('N14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('P14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\SIN\\compra_M02406LAA01.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('F14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('H14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('J14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('L14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('N14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('P14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\SIN\\compra_M02406RRD01.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('F14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('H14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('J14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('L14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('N14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+sht1.range('P14').options(index=False,header=False).value=pd.DataFrame(np.zeros((24, 1)))
+
+
+
+vtivy=pd.DataFrame(np.zeros((24, 22)))
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\SIN\\venta_M02406EAPIMP-0.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('G24').options(index=False,header=False).value=vtivy
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\SIN\\venta_M02406LAAIMP.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('G24').options(index=False,header=False).value=vtivy
+
+
+
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\SIN\\venta_M02406RRDIMP.xlsx')
+sht1 = wb.sheets['Hoja1']
+sht1.range('G24').options(index=False,header=False).value=vtivy
+
+time.sleep(10)
+wb.app.quit()
+time.sleep(5)

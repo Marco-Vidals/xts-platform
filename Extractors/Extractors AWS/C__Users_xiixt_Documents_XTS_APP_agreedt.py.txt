@@ -1,0 +1,116 @@
+import numpy as np
+import pandas as pd
+import datetime
+from datetime import timedelta
+import xlwings as xw
+import time
+from IPython.display import display
+import time
+import shutil
+
+
+hoy=datetime.date.today()
+dmas1=hoy+timedelta(days=1)
+fecha=dmas1.strftime('%m/%d/%Y')
+tiempo_inicio = datetime.datetime.now() 
+
+agreedt=pd.read_excel("C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\MORNING\\A2_MORNINGS_ERCOT_910.xlsx", sheet_name='Agreed Transactions', skiprows = 5)
+cen_to_cai_ivy=agreedt.iloc[0:24,2:39]
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\AGREED_CAISO_ERCOT.xlsx')
+sht1 = wb.sheets['Morning AGREED TRANSACTIONS']
+#sht1.range('B2').value = fecha
+sht1.range('C35').options(index=False,header=False).value=cen_to_cai_ivy
+
+time.sleep(8)
+wb.app.quit()
+
+agreedt=pd.read_excel("C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\Morning\\B2_MORNINGS_CAISO_930.xlsx", sheet_name='Agreed Transactions', skiprows = 5)
+cen_to_cai_ivy=agreedt.iloc[0:24,2:39]
+wb = xw.Book('C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\AGREED_CAISO_ERCOT.xlsx')
+sht1 = wb.sheets['Morning AGREED TRANSACTIONS']
+sht1.range('B2').value = f'{fecha[0:2]}/{fecha[3:5]}/{fecha[6:]}'
+sht1.range('C6').options(index=False,header=False).value=cen_to_cai_ivy
+
+time.sleep(8)
+wb.app.quit()
+time.sleep(5)
+
+
+# Fechas para abrir archivos
+fecha = datetime.datetime.now()
+fecha_menos_uno = fecha - timedelta(days = 1)
+fecha_mas_uno = fecha + timedelta(days = 1)
+fecha_fin = (fecha_mas_uno + timedelta(days = 6)) #para capacidades
+fecha_str_ayer = fecha_menos_uno.strftime('%x')
+fecha_str_hoy = fecha.strftime('%x') 
+fecha_str_manana = fecha_mas_uno.strftime('%x')
+fecha_str_fin = fecha_fin.strftime('%x')
+anio=fecha_mas_uno.strftime('%Y')
+dia_manana = fecha_str_manana[3:5]
+mes_manana = fecha_str_manana[0:2]
+anio_manana = fecha_str_manana[6:]
+print(fecha)
+
+
+AgreedTransactionsValidation = pd.read_excel("C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\AGREED_CAISO_ERCOT.xlsx",sheet_name='Morning AGREED TRANSACTIONS',skiprows = 33)
+
+HORASy_AGREED_TRANSACTIONS = AgreedTransactionsValidation.iloc[0:25,3]
+CENACE_EXPORT_TO_ercot = AgreedTransactionsValidation.iloc[0:25,2:7]
+ercot_EXPORT_TO_CENACE = AgreedTransactionsValidation.iloc[0:25,12:17]
+CENACE_EXPORT_TO_ercot_OMS = AgreedTransactionsValidation.iloc[0:25,23:28]
+ercot_EXPORT_TO_CENACE_OMS = AgreedTransactionsValidation.iloc[0:25,31:36]
+print("-------------------------------------------------------------------------------")
+print("------------ AGREED TRANSACTIONS VALIDATION------------------------------------")
+print("-------------------------------------------------------------------------------")
+print("--------VALIDACI├ôN  AGREED TRANSACTIONS CENACE EXPORT TO ERCOT LAA T1 y T2 ------- ")
+print(CENACE_EXPORT_TO_ercot)
+print("-------------------------------------------------------------------------------")
+print("--------VALIDACI├ôN  AGREED TRANSACTIONS CENACE EXPORT TO ERCOT RRD T1 y T2 ------- ")
+print(ercot_EXPORT_TO_CENACE)
+print("-------------------------------------------------------------------------------")
+print("--------VALIDACI├ôN  AGREED TRANSACTIONS ERCOT EXPORT TO CENACE LAA T1 y T2 ------- ")
+print(CENACE_EXPORT_TO_ercot_OMS)
+print("-------------------------------------------------------------------------------")
+print("-------VALIDACI├ôN AGREED TRANSACTIONS ERCOT EXPORT TO CENACE  RRD T1 Y T2---------- ")
+print(ercot_EXPORT_TO_CENACE_OMS)
+print("-------------------------------------------------------------------------------")
+print("ES CORRECTA LA INFORMACI├ôN DE ERCOT QUE VOY A CREAR Y ENVIAR ????")
+good = input("si estuvo correcto?:")
+if good=='y':
+    AgreedTransactionsValidation = pd.read_excel("C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\AGREED_CAISO_ERCOT.xlsx",skiprows = 4)
+    HORAS_AGREED_TRANSACTIONS = AgreedTransactionsValidation.iloc[0:25,3]
+    CENACE_EXPORT_TO_CAISO = AgreedTransactionsValidation.iloc[0:24,2:7]
+    CAISO_EXPORT_TO_CENACE = AgreedTransactionsValidation.iloc[0:24,12:17]
+    CENACE_EXPORT_TO_CAISO_OMS = AgreedTransactionsValidation.iloc[0:24,23:28]
+    CAISO_EXPORT_TO_CENACE_OMS = AgreedTransactionsValidation.iloc[0:24,31:36]
+    print("-------------------------------------------------------------------------------")
+    print("------------ AGREED TRANSACTIONS VALIDATION------------------------------------")
+    print("-------------------------------------------------------------------------------")
+    print("--------VALIDACI├ôN  AGREED TRANSACTIONS CAISO-IVY EXPORT TO MEX T1 y T2 ------- ")
+    print(CENACE_EXPORT_TO_CAISO)
+    print("-------------------------------------------------------------------------------")
+    print("--------VALIDACI├ôN  AGREED TRANSACTIONS CAISO-OMS EXPORT TO MEX T1 y T2 ------- ")
+    print(CAISO_EXPORT_TO_CENACE)
+    print("-------------------------------------------------------------------------------")
+    print("--------VALIDACI├ôN  AGREED TRANSACTIONS MEX-IVY EXPORT TO CAISO T1 y T2 ------- ")
+    print(CENACE_EXPORT_TO_CAISO_OMS)
+    print("-------------------------------------------------------------------------------")    
+    print("--------VALIDACI├ôN  AGREED TRANSACTIONS MEX-OMS EXPORT TO CAISO T1 y T2 ------- ")
+    print(CAISO_EXPORT_TO_CENACE_OMS)
+    print("-------------------------------------------------------------------------------")
+    print("ES CORRECTA LA INFORMACI├ôN DE CAISO QUE VOY A CREAR Y ENVIAR ????")
+    good = input("si estuvo correcto?")
+    
+    if good == "y":
+        original = r'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\IMPEX\\FORMATOS\\AGREED_CAISO_ERCOT.xlsx'
+        target_file = f'XIIX-SENA operations for {mes_manana}-{dia_manana}-20{anio_manana}-1.xlsx'
+        target = f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\AGREED TRANSACTIONS\\{anio}\\{mes_manana}\\{target_file}'
+        shutil.copyfile(original, target)
+        import Forecast_bdupdater
+        import Cenace_Files_creator
+    else:
+          print("validar de nuevo")
+else:
+    print("validar de nuevo")
+        
+

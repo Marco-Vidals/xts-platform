@@ -1,0 +1,196 @@
+# -*- coding: utf-8 -*-
+
+def actualizar_ENVERUS_CAISO(bd,serv,usern,pasw,crear_tabla):
+    import pyodbc
+    import pandas as pd
+    import datetime
+    import zipfile 
+    
+    #Extraemos los archivos actuales del forecast y todo
+    with zipfile.ZipFile('C:\\Users\\xiixt\\Documents\\XTS\\APP\\forecast.zip', 'r') as zip_ref:
+        zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+    mx=pd.read_csv('forecastMexicoAhd07IVY-230.csv',skiprows=1)
+    ivy=pd.read_csv('forecastMexicoAhd07IVY-230.csv',skiprows=27)
+    oms=pd.read_csv('forecastMexicoAhd07OMS-230.csv',skiprows=27)
+    cai=pd.read_csv('forecastCaisAhdROA230_2_N101.csv',skiprows=1)
+    ahroa=pd.read_csv('forecastCaisAhdROA230_2_N101.csv',skiprows=27)
+    ahtji=pd.read_csv('forecastCaisAhdTJI230_2_N101.csv',skiprows=27)
+    sol=pd.read_csv('forecastCaisTotal_Solar.csv',skiprows=1)
+    froa=pd.read_csv('forecastCaisFmmROA-230_2_N101.csv',skiprows=27)
+    ftji=pd.read_csv('forecastCaisFmmTJI-230_2_N101.csv',skiprows=27)
+    ## solo necesitamos los primeros 24 valores ivy=ivy.iloc[0:24,:]
+    
+    ##Fecha, tenemos que empezar con ayer para actualizar el FMM
+    b=datetime.datetime.today()-datetime.timedelta(days=1)
+    #b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.replace(hour=0,minute=0,second=0,microsecond=0)
+    c=[0 for i in range(72)]
+    for i in range(72):
+        c[i]=b+datetime.timedelta(hours=i)
+        
+    ##Definimos la conexi├│n a la base
+    def conexion_bd(server, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+passw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+
+    ##Aqui creamos la conexion
+    
+    a=conexion_bd(serv,bd,usern,pasw)
+    ##Primero vamos a hacer el codigo que hace la tabla
+    if crear_tabla==1:
+        cursorcreate=a.cursor()
+        consulta='create table DATOS_ENVERUS_CAISO (fecha datetime primary key,\
+            PML_IVY float, PML_TJI float,DA_ROA float, DA_TJI float, FMM_ROA float,\
+                FMM_TJI float, LOAD_MX float, LOAD_CAISO float, SOLAR_CAISO float\
+                    )'
+        cursorcreate.execute(consulta)
+        cursorcreate.commit()
+        cursorcreate.close()
+        cursorinsert=a.cursor()
+        consulta='insert into DATOS_ENVERUS_CAISO (fecha) values (?)'
+        for i in range(48):
+            cursorinsert.execute(consulta,c[i])
+    ##Ahora, actualizamos los datos de ayer.
+    cursorupdate=a.cursor()
+    consulta='update DATOS_ENVERUS_CAISO set PML_IVY=?, PML_TJI=?,DA_ROA=?,DA_TJI=?,\
+        FMM_ROA=?,FMM_TJI=?,LOAD_MX=?,LOAD_CAISO=?,SOLAR_CAISO=? \
+            where fecha =?'
+    for i in range(24):
+        ''' Aqui tenemos que actualizar'''
+        cursorupdate.execute(consulta, ivy.iloc[i,1],oms.iloc[i,1],ahroa.iloc[i,1],\
+                             ahtji.iloc[i,1],\
+                             froa.iloc[i,1],ftji.iloc[i,1],mx.iloc[i,1],cai.iloc[i,1],\
+                                 sol.iloc[i,1],c[i])
+        cursorupdate.execute(consulta, ivy.iloc[i,2],oms.iloc[i,2],ahroa.iloc[i,2],\
+                             ahtji.iloc[i,2],\
+                             froa.iloc[i,2],ftji.iloc[i,2],mx.iloc[i,2],cai.iloc[i,2],\
+                             sol.iloc[i,2],c[i+24])
+    cursorupdate.commit()
+    cursorupdate.close()
+    ##Ahora creamos el forecast
+    
+    cursorinsert=a.cursor()
+    consulta='insert into DATOS_ENVERUS_CAISO (fecha,PML_IVY,PML_TJI,DA_ROA,DA_TJI,\
+            FMM_ROA,FMM_TJI,LOAD_MX,LOAD_CAISO,SOLAR_CAISO)\
+            values(?,?,?,?,?,?,?,?,?,?)'
+    for i in range(24):
+        cursorinsert.execute(consulta,c[i+48],ivy.iloc[i,3],oms.iloc[i,3],\
+                             ahroa.iloc[i,3],ahtji.iloc[i,3],\
+                             froa.iloc[i,3],ftji.iloc[i,3],mx.iloc[i,3],\
+                                 cai.iloc[i,3],sol.iloc[i,3])
+    cursorinsert.commit()
+    cursorinsert.close()
+    ##Ahora actualizamos los datos de ma├▒ana
+    
+    a.close()
+    
+def actualizar_ENVERUS_ERCOT(bd,serv,usern,pasw,crear_tabla):
+    import pyodbc
+    import pandas as pd
+    import datetime
+    import zipfile 
+    #Extraemos los archivos actuales del forecast y todo
+    with zipfile.ZipFile('C:\\Users\\xiixt\\Documents\\XTS\\APP\\forecast.zip', 'r') as zip_ref:
+        zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+    mxe=pd.read_csv('forecastMexicoAhd06LAA-138.csv',skiprows=1)
+    ahlaa=pd.read_csv('forecastMexicoAhd06LAA-138.csv',skiprows=27)
+    ahrrd=pd.read_csv('forecastMexicoAhd06RRD-138.csv',skiprows=27)
+    erc=pd.read_csv('forecastErcotAhdDCL.csv',skiprows=1)
+    ahdcl=pd.read_csv('forecastErcotAhdDCL.csv',skiprows=27)
+    ahdcr=pd.read_csv('forecastErcotAhdDCR.csv',skiprows=27)
+    wenv=pd.read_csv('forecastErcotTotal_Wind.csv',skiprows=1)
+    rtdcl=pd.read_csv('forecastErcotRtDCL.csv',skiprows=27)
+    rtdcr=pd.read_csv('forecastErcotRtDCR.csv',skiprows=27)
+    ##Fecha, tenemos que empezar con ayer para actualizar el FMM
+    b=datetime.datetime.today()-datetime.timedelta(days=1)
+    #b=datetime.datetime.today()+datetime.timedelta(days=1)
+    b=b.replace(hour=0,minute=0,second=0,microsecond=0)
+    c=[0 for i in range(72)]
+    for i in range(72):
+        c[i]=b+datetime.timedelta(hours=i)
+    
+    ##Definimos la conexi├│n a la base
+    def conexion_bd(server, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+passw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+    a=conexion_bd(serv,bd,usern,pasw)
+    
+    if crear_tabla==1:
+        cursorcreate=a.cursor()
+        consulta='create table DATOS_ENVERUS_ERCOT (fecha datetime primary key,\
+            PML_LAA float, PML_RRD float,DA_DCL float, DA_DCR float, RT_DCL float,\
+                RT_DCR float, LOAD_MX float, LOAD_ERCOT float, WIND_ERCOT float\
+                    )'
+        cursorcreate.execute(consulta)
+        cursorcreate.commit()
+        cursorcreate.close()
+        cursorinsert=a.cursor()
+        consulta='insert into DATOS_ENVERUS_ERCOT (fecha) values (?)'
+        for i in range(48):
+            cursorinsert.execute(consulta,c[i])
+    ##Ahora, actualizamos los datos de ayer.
+    cursorupdate=a.cursor()
+    consulta='update DATOS_ENVERUS_ERCOT set PML_LAA=?, PML_RRD=?,DA_DCL=?,DA_DCR=?,\
+        RT_DCL=?,RT_DCR=?,LOAD_MX=?,LOAD_ERCOT=?,WIND_ERCOT=? \
+            where fecha =?'
+    for i in range(24):
+        ''' Aqui tenemos que actualizar'''
+        cursorupdate.execute(consulta, ahlaa.iloc[i,1],ahrrd.iloc[i,1],ahdcl.iloc[i,1],\
+                             ahdcr.iloc[i,1],\
+                             rtdcl.iloc[i,1],rtdcr.iloc[i,1],mxe.iloc[i,1],erc.iloc[i,1],\
+                                 wenv.iloc[i,1],c[i])
+        cursorupdate.execute(consulta, ahlaa.iloc[i,2],ahrrd.iloc[i,2],ahdcl.iloc[i,2],\
+                             ahdcr.iloc[i,2],\
+                             rtdcl.iloc[i,2],rtdcr.iloc[i,2],mxe.iloc[i,2],erc.iloc[i,2],\
+                             wenv.iloc[i,2],c[i+24])
+    cursorupdate.commit()
+    cursorupdate.close() 
+    ##Ahora creamos el forecast
+    
+    cursorinsert=a.cursor()
+    consulta='insert into DATOS_ENVERUS_ERCOT (fecha,PML_LAA,PML_RRD,DA_DCL,DA_DCR,\
+            RT_DCL,RT_DCR,LOAD_MX,LOAD_ERCOT,WIND_ERCOT)\
+            values(?,?,?,?,?,?,?,?,?,?)'
+    for i in range(24):
+        cursorinsert.execute(consulta,c[i+48],ahlaa.iloc[i,3],ahrrd.iloc[i,3],\
+                             ahdcl.iloc[i,3],ahdcr.iloc[i,3],\
+                             rtdcl.iloc[i,3],rtdcr.iloc[i,3],mxe.iloc[i,3],\
+                                 erc.iloc[i,3],wenv.iloc[i,3])
+    cursorinsert.commit()
+    cursorinsert.close()
+    ##Ahora actualizamos los datos de ma├▒ana
+    
+    a.close()
+    
+def Actualizar_ENVERUS_GUAT(bd,serv,usern,pasw,crear_tabla):
+    import pyodbc
+    import pandas as pd
+    import datetime
+    import zipfile     
+    with zipfile.ZipFile('C:\\Users\\xiixt\\Documents\\XTS\\APP\\forecast.zip', 'r') as zip_ref:
+        zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+    lbr=pd.read_csv('forecastMexicoAhd06LBR-230.csv',skiprows=27)
+    def conexion_bd(server, bd, usern, passw):
+        try:
+            conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                        DATABASE='+bd+';UID='+usern+'; PWD='+passw,autocommit=True)
+            return conx
+            print('Conexi├│n exitosa')
+        except:
+            print('No funcion├│ la conexi├│n')
+    a=conexion_bd(serv,bd,usern,pasw)    
+    
+    if crear_tabla==1:
+        cursorcreate=a.cursor()   
+        consulta='Create Table Datos_Enverus_Guat (fecha datetime primary key,\
+            PML_LBR float)'

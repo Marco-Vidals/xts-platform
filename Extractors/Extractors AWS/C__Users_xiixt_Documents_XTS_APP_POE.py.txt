@@ -1,0 +1,115 @@
+import numpy as np
+import pandas as pd
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import lxml
+import urllib.request
+import shutil
+import re
+import os
+import pytemperature
+import pyodbc
+from datetime import datetime
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+
+crear=0
+accion=0
+ffecha=0
+#Para acci├│n: actualizar = 1 , insertar=0
+#Para fecha: hoy=0 , d├¡as anteriores=1
+
+conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+a=conx.cursor()
+
+def mesf(fecha):
+    if fecha=='01':
+        mes='ENERO'
+    elif fecha=='02':
+        mes='FEBRERO'
+    elif fecha=='03': 
+        mes='MARZO'
+    elif fecha=='04':
+        mes='ABRIL'
+    elif fecha=='05':
+        mes='MAYO'
+    elif fecha=='06':
+        mes='JUNIO'
+    elif fecha== '07':
+        mes='JULIO'
+    elif fecha=='08':
+        mes='AGOSTO'
+    elif fecha=='09':
+        mes='SEPTIEMBRE'
+    elif fecha=='10':
+        mes='OCTUBRE'
+    elif fecha=='11':
+        mes='NOVIEMBRE'
+    elif fecha=='12':
+        mes='DICIEMBRE'
+    return mes
+
+def poe(ffecha,accion):
+    if ffecha==0:
+        hoy=datetime.today()-timedelta(days=0)
+        hoy2=hoy.strftime('%d%m%Y')
+        anio=hoy2[4:]
+    if ffecha==1:
+        hoyy=datetime.today()-timedelta(days=1)
+        hoy3=hoyy.strftime('%d%m%Y')    
+    mes=mesf(hoy2[2:4])
+    if ffecha==1:
+        f_i='31-08-2022'
+        aa=datetime.datetime.strptime(f_i,'%d-%m-%Y')
+        for j in range(2):
+            aa=aa+timedelta(days=1)
+            d=aa.strftime('%d%m%Y')
+            b=aa.replace(hour=0,minute=0,second=0,microsecond=0)
+            c=[0 for i in range(24)]
+            for i in range(0,24):
+                c[i]=b+datetime.timedelta(hours=i)
+            with zipfile.ZipFile(f'G:\\Unidades compartidas\\BBXTS2.0\\GUATEMALA\\resul{d}.zip','r') as zip_ref:
+                zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+            dfresul=pd.read_excel(f'C:\\Users\\xiixt\\Documents\\XTS\\APP\\{d[0:2]} {mes} {d[4:]}.xlsx',sheet_name='POE',skiprows=5)  #dfresul.iloc[0:24,5]    
+            consulta='insert into POE$ (fecha, POE) values(?,?)'
+            print(d)
+            for i in range(24):
+                a.execute(consulta,c[i],dfresul.iloc[i,5])
+    
+    if ffecha==0:
+        dby=datetime.today()-timedelta(days=2)
+        dby2=dby.strftime('%d%m%Y')
+        resultados='https://www.amm.org.gt/ultpub/'
+        url=requests.get('https://www.amm.org.gt/ultpub/ultimas_pub_resul.php').text
+        soup=BeautifulSoup(url,'lxml')
+        ref=(soup.find('a')).get('href')
+        resul='hoy2.zip'
+        with urllib.request.urlopen(f'{resultados}{ref}') as response, open(resul,'wb')  as out_guat:
+            shutil.copyfileobj(response,out_guat) 
+        with zipfile.ZipFile(f'C:\\Users\\xiixt\\Documents\\XTS\\APP\\{resul}','r') as zip_ref:
+             zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+        dfresul=pd.read_excel(f'C:\\Users\\xiixt\\Documents\\XTS\\APP\\{dby2[0:2]} {mes} {dby2[4:]}.xlsx',sheet_name='POE',skiprows=5)
+        b=dby.replace(hour=0,minute=0,second=0,microsecond=0)
+        c=[0 for i in range(24)]
+        for i in range(0,24):
+            c[i]=b+timedelta(hours=i)
+        if accion==1:
+            consulta = 'update POE set POE=? where fecha=?'
+            for i in range(0,24):
+                a.execute(consulta,dfresul.iloc[i,5],c[i])
+        if accion==0:
+            consulta= 'insert into POE (fecha,POE) values(?,?)'
+            for i in range(0,24):
+                a.execute(consulta,c[i],dfresul.iloc[i,5])
+        a.close()
+        
+poe(0,0)

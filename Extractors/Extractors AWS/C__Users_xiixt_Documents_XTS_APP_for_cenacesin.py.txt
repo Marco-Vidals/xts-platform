@@ -1,0 +1,68 @@
+import os
+import pandas as pd
+import xml.etree.ElementTree as ET
+from datetime import datetime
+
+# Ruta de la carpeta donde se encuentran los archivos XML
+carpeta = r'C:\Users\Administrator\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\Escritorio\CFE'
+
+# Lista para almacenar los datos
+datos = []
+
+# Iterar sobre los archivos en la carpeta
+for archivo in os.listdir(carpeta):
+    if archivo.endswith('.xml'):  # Verificar que el archivo sea XML
+        nombre_archivo = os.path.splitext(archivo)[0]  # Nombre del archivo sin extensi├│n
+        
+        # Construir la ruta completa al archivo XML
+        ruta_xml = os.path.join(carpeta, archivo)
+        
+        # Parsear el archivo XML
+        tree = ET.parse(ruta_xml)
+        root = tree.getroot()
+        
+        # Extraer los datos requeridos
+        consumo3f = root.find('.//CONSUMO3F').text if root.find('.//CONSUMO3F') is not None else None
+        consumo2f = root.find('.//CONSUMO2F').text if root.find('.//CONSUMO2F') is not None else None
+        consumo1f = root.find('.//CONSUMO1F').text if root.find('.//CONSUMO1F') is not None else None
+        demanda3p = root.find('.//DEMANDA3P').text if root.find('.//DEMANDA3P') is not None else None
+        demanda4 = root.find('.//DEMANDAR04').text if root.find('.//DEMANDAR04') is not None else None
+        demanda1p = root.find('.//DEMANDA1P').text if root.find('.//DEMANDA1P') is not None else None
+        demanda2p = root.find('.//DEMANDA2P').text if root.find('.//DEMANDA2P') is not None else None
+        kvarh = root.find('.//KVARH').text if root.find('.//KVARH') is not None else None
+        facpotr01 = root.find('.//FACPOTR01').text if root.find('.//FACPOTR01') is not None else None
+        
+        # Extraer la fecha del XML (asumiendo que est├í en una etiqueta <FECHA> dentro del XML)
+        fecha = root.find('.//FECHA').text if root.find('.//FECHA') is not None else None
+        
+        # Si la fecha est├í en un formato espec├¡fico, puedes convertirla aqu├¡ si es necesario
+        # Por ejemplo, si la fecha est├í en formato 'YYYYMMDD', puedes convertirla as├¡:
+        if fecha:
+            try:
+                fecha = datetime.strptime(fecha, '%Y%m%d').strftime('%Y-%m-%d')
+            except ValueError:
+                fecha = None
+        
+        # Guardar los datos en la lista
+        datos.append({
+            'Archivo': nombre_archivo,
+            'Fecha': fecha,
+            'CONSUMO3F': consumo3f,
+            'CONSUMO2F': consumo2f,
+            'CONSUMO1F': consumo1f,
+            'DEMANDA3P': demanda3p,
+            'DEMANDAR04': demanda4,
+            'DEMANDA1P': demanda1p,
+            'DEMANDA2P': demanda2p,
+            'KVARH': kvarh,
+            'FACPOTR01': facpotr01
+        })
+
+# Crear un DataFrame con los datos
+df = pd.DataFrame(datos)
+
+# Guardar los datos en un archivo Excel
+nombre_archivo_excel = os.path.join(carpeta, 'datos_extraidos.xlsx')
+df.to_excel(nombre_archivo_excel, index=False)
+
+print(f'Datos extra├¡dos guardados en {nombre_archivo_excel}')

@@ -1,0 +1,300 @@
+import numpy as np
+import pandas as pd
+import datetime
+import requests
+import json
+from datetime import timedelta
+import zipfile
+import time
+import xlwings as xw
+import numpy as np
+import pandas as pd
+from pycaiso.oasis import Node
+import requests
+import json
+import zipfile
+import time
+import xlwings as xw
+import GITBASH
+import CaisoDA
+import CaisoFMM
+import time
+import ErcotDA
+import ErcotRt
+import impexpasig
+
+
+fi=datetime.datetime.today()+timedelta(days=1)
+aa1=fi.replace(hour=0,minute=0,second=0,microsecond=0)
+aa2=aa1-timedelta(days=1)
+aa3=aa2-timedelta(days=1)
+
+
+
+print(' SISTEMAS:')
+print(' CAISO : 1')
+print(' ERCOT : 2')
+ss=input('┬┐Cu├íl sistema vas a actualizar? ')
+
+if ss=='1':
+    sistema2='CAISO'
+else:
+    sistema2='ERCOT'
+    
+res_tc = requests.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF60653/datos/oportuno?token=44a87bef665b6d7777a5dce5fe45a4cd39a4d2661e6e507b36ddf8fb0dc11aa2")
+res_dict = json.loads(res_tc.content)
+resultados = res_dict['bmx']['series']
+resultados_api_banxico = [pd.DataFrame.from_dict(resultados[i]['datos']) for i in range(len(resultados))] 
+tipo_de_cambio = pd.to_numeric(resultados_api_banxico[0].iloc[0, 1]) 
+    
+sistema=['SIN','BCA']
+proceso=['MDA','MTR']
+nodo=['07IVY-230','07OMS-230','06LAA-138',	'06RRD-138','09LBR-230']
+fhoy=datetime.date.today()+timedelta(days=1)
+fecha=fhoy.strftime('%d-%m-%Y')
+fstr=fhoy.strftime('%d%m%Y')
+
+def pml(fecha,sist,proc,nd):
+    f=[]
+    hr=[]
+    lpml=[]
+    fii=fhoy.strftime('%d%m%Y')
+    url=f'https://ws01.cenace.gob.mx:8082/SWPML/SIM/{sistema[sist]}/{proceso[proc]}/{nodo[nd]}/{fii[4:]}/{fii[2:4]}/{fii[:2]}/{fii[4:]}/{fii[2:4]}/{fii[:2]}/JSON'
+    res = requests.get(url)
+    res_dict = json.loads(res.content)
+    resultados = res_dict['Resultados']
+    for j in range(24):
+        f.append(resultados[0]['Valores'][j]['fecha'])
+        hr.append(resultados[0]['Valores'][j]['hora'])
+        lpml.append(resultados[0]['Valores'][j]['pml'])          
+    df=pd.DataFrame(zip(f,hr,lpml),columns=['fecha','hora','pml'])
+    print(url)
+    return df
+
+with zipfile.ZipFile('C:\\Users\\xiixt\\Documents\\XTS\\APP\\forecast.zip', 'r') as zip_ref:
+    zip_ref.extractall('C:\\Users\\xiixt\\Documents\\XTS\\APP')
+
+if ss=='1':
+    ivymda=pml(fecha,1,0,0)
+    omsmda=pml(fecha,1,0,1)
+    ah1=CaisoDA.oasis('h', 'PRC_LMP','12','DAM','ROA-230_2_N101',1)
+    time.sleep(5)
+    ah2=CaisoDA.oasis('h', 'PRC_LMP','12','DAM','TJI-230_2_N101',1)
+    time.sleep(5)
+    froa=CaisoFMM.dfmm('h', 'ROA-230_2_N101',0)
+    time.sleep(5)
+    ftji=CaisoFMM.dfmm('h', 'TJI-230_2_N101',0)
+    ##Forecast
+    """Preguntar si se necesita forecast de (hoy+2)"""
+    da1=pd.read_csv('forecastCaisAhdROA230_2_N101.csv',skiprows=27)
+    da2=pd.read_csv('forecastCaisAhdTJI230_2_N101.csv',skiprows=27)
+    fmm1=pd.read_csv('forecastCaisFmmROA-230_2_N101.csv',skiprows=27)
+    fmm2 =pd.read_csv('forecastCaisFmmTJI-230_2_N101.csv',skiprows=27)
+    sistema2='CAISO'
+    
+    bca=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/BCA/MDA/{fstr[4:]}/{fstr[2:4]}/{fstr[0:2]}/{fstr[4:]}/{fstr[2:4]}/{fstr[0:2]}/JSON'
+    res = requests.get(bca)
+    res_dict = json.loads(res.content)
+    resultados = res_dict['Resultados']
+    resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))]
+    df_IVY=resultados_api2[0]
+    df_OMS=resultados_api2[1]
+    
+if ss=='2':
+    ivymda=pml(fecha,0,0,2)
+    omsmda=pml(fecha,0,0,3)
+    ercdah=ErcotDA.daercot(0)
+    ah1=(ercdah[ercdah['SettlementPoint'].isin(['DC_L'])]).reset_index()
+    ah2=(ercdah[ercdah['SettlementPoint'].isin(['DC_R'])]).reset_index()
+    ercrt=ErcotRt.ercotrt(0)
+    froa=ercrt[1]
+    ftji=ercrt[0]
+    da1=pd.read_csv('forecastErcotAhdDCL.csv',skiprows=27)
+    da2=pd.read_csv('forecastErcotAhdDCR.csv',skiprows=27)
+    fmm1=pd.read_csv('forecastErcotRtDCL.csv',skiprows=27)
+    fmm2=pd.read_csv('forecastErcotRtDCR.csv',skiprows=27)
+    sistema2='ERCOT'
+    
+    sin=f'https://ws01.cenace.gob.mx:8082/SWEAIMPEX/SIM/SIN/MDA/{fstr[4:]}/{fstr[2:4]}/{fstr[0:2]}/{fstr[4:]}/{fstr[2:4]}/{fstr[0:2]}/JSON'
+    res = requests.get(sin)
+    res_dict = json.loads(res.content)
+    resultados = res_dict['Resultados']
+    resultados_api2 = [pd.DataFrame.from_dict(resultados[i]['Valores']) for i in range(len(resultados))]
+    df_LAA=resultados_api2[0]
+    df_RRD=resultados_api2[1]
+    
+def rtrans(sist,col,impo,col2):
+    try:
+        asig=pd.read_excel(f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SA DE CV\\XTS-OPS\\Asignaciones\\{sist}\\Energ├¡a asignada {fstr} M024-XiiX.xlsx', skiprows=3,usecols=('B:AC'))
+        asig_t=np.transpose(asig)
+        ceros=1
+    except:
+        ##Subimos estos datos a la base que ser├¡a en CEROS
+        asig_t=pd.DataFrame(np.zeros((28,4)))
+        ceros='y'
+        
+    if ceros==1:
+        if sist=='BCA':
+            oper=pd.read_excel(f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\AGREED TRANSACTIONS\\{fstr[4:]}\\{fstr[2:4]}\XIIX-SENA operations for {fstr[2:4]}-{fstr[:2]}-{fstr[4:]}-1.xlsx',skiprows = 4,usecols=('B:AM'))
+        if sist=='SIN':
+            oper=pd.read_excel(f'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\AGREED TRANSACTIONS\\{fstr[4:]}\\{fstr[2:4]}\XIIX-SENA operations for {fstr[2:4]}-{fstr[:2]}-{fstr[4:]}-1.xlsx',skiprows = 33,usecols=('B:AM'))
+        mp=[]
+        mw=[]
+        pr=[]
+        for i in range(24):
+            agreed=(oper.iloc[i,col])
+            asignado=asig_t.iloc[4+i,col2]
+            t1=oper.iloc[i,col+1]
+            p1=oper.iloc[i,col+2]
+            t2=oper.iloc[i,col+3]
+            p2=oper.iloc[i,col+4]
+            t3=oper.iloc[i,col+5]
+            p3=oper.iloc[i,col+6]
+            if impo=='y':
+                t4=oper.iloc[i,col+7]
+                p4=oper.iloc[i,col+8]
+            else:
+                p4=1
+            #print(agreed,asignado)
+            if asignado<=agreed:
+                sleeve=asignado
+                specmw=0
+                specp=0
+            elif asignado <= (agreed+t1):
+                sleeve=agreed
+                specmw=asignado-agreed
+                specp=p1
+            elif asignado <= (agreed+t1+t2):
+                sleeve=agreed
+                specmw=asignado-agreed
+                specp=((t1*p1)+(specmw-t1)*p2)/specmw
+            elif asignado <= (agreed+t1+t2+t3):
+                sleeve=agreed
+                specmw=asignado-agreed
+                specp=((t1*p1)+(t2*p2)+(specmw-t1-t2)*p3)/specmw
+            else:
+                sleeve=agreed
+                specmw=asignado-agreed
+                specp=((t1*p1)+(t2*p2)+(t3*p3)+(specmw-t1-t2-t3)*p4)/specmw
+            
+            mp.append(sleeve)
+            mw.append(specmw)
+            pr.append(specp)
+        file=pd.DataFrame(zip(mp,mw,pr),columns=['MP','MW','PR'])
+        
+    if ceros=='y':
+        file=pd.DataFrame(np.zeros((24,3)))
+            
+    return file
+
+
+if sistema2=='CAISO':      
+    ivyimp=rtrans('BCA',1,'y',0)
+    omsimp=rtrans('BCA',11,'y',1)
+    ivy=rtrans('BCA',22,'n',2)
+    oms=rtrans('BCA',30,'n',3)
+    filea='Afternoon.xlsx'
+    
+    df=pd.DataFrame({
+        'PML_IVY': ivymda.iloc[0:24,2],
+        'PML_OMS': omsmda.iloc[0:24,2],
+        'DA_ROA': ah1.iloc[0:24,1],
+        'DA_CONG_ROA': ah1.iloc[0:24,2],
+        'DA_ENE_ROA': ah1.iloc[0:24,3],
+        'DA_LOSS_ROA': ah1.iloc[0:24,4],
+        'DA_GHG_ROA': ah1.iloc[0:24,5],
+        'DA_TJI': ah2.iloc[0:24,1],
+        'DA_CONG_TJI': ah2.iloc[0:24,2],
+        'DA_ENE_TJI': ah2.iloc[0:24,3],
+        'DA_LOSS_TJI': ah2.iloc[0:24,4],
+        'DA_GHG_TJI': ah2.iloc[0:24,5],
+        'FMM_ROA': froa.iloc[0:24,2],
+        'FMM_CONG_ROA': froa.iloc[0:24,3],
+        'FMM_ENE_ROA': froa.iloc[0:24,4],
+        'FMM_LOSS_ROA': froa.iloc[0:24,5],
+        'FMM_GHG_ROA': froa.iloc[0:24,6],
+        'FMM_TJI': ftji.iloc[0:24,2],
+        'FMM_CONG_TJI': ftji.iloc[0:24,3],
+        'FMM_ENE_TJI': ftji.iloc[0:24,4],
+        'FMM_LOSS_TJI': ftji.iloc[0:24,5],
+        'FMM_GHG_TJI': ftji.iloc[0:24,6],
+        'IVY_IMP_MP':ivyimp.iloc[0:24,0],
+        'IVY_IMP_MW':ivyimp.iloc[0:24,1],
+        'IVY_IMP_PR':ivyimp.iloc[0:24,2],
+        'IVY_MP':ivy.iloc[0:24,0],
+        'IVY_MW':ivy.iloc[0:24,1],
+        'IVY_PR':ivy.iloc[0:24,2],
+        'OMS_IMP_MP':omsimp.iloc[0:24,0],
+        'OMS_IMP_MW':omsimp.iloc[0:24,1],
+        'OMS_IMP_PR':omsimp.iloc[0:24,2],
+        'OMS_MP':oms.iloc[0:24,0],
+        'OMS_MW':oms.iloc[0:24,1],
+        'OMS_PR':oms.iloc[0:24,2],
+        'DAROA_TDY_ENV':da1.iloc[0:24,2],
+        'DAROA_NXT_ENV':da1.iloc[0:24,3],
+        'DATJI_TDY_ENV':da2.iloc[0:24,2],   
+        'DATJI_NXT_ENV':da2.iloc[0:24,3],  
+        'FMMROA_TDY_ENV':fmm1.iloc[0:24,2],
+        'FMMROA_NXT_ENV':fmm1.iloc[0:24,3],
+        'FMMTJI_TDY_ENV':fmm2.iloc[0:24,2],   
+        'FMMTJI_NXT_ENV':fmm2.iloc[0:24,3],
+        'Tipo de cambio': tipo_de_cambio,
+        'IMPO-ASIGNADA-IVY-MDA (M)':df_IVY.iloc[0:24,2],
+        'EXPO-ASIGNADA-IVY-MDA (M)':df_IVY.iloc[0:24,7],
+        'IMPO-ASIGNADA-OMS-MDA (M)':df_OMS.iloc[0:24,2],
+        'EXPO-ASIGNADA-OMS-MDA (M)':df_OMS.iloc[0:24,7],
+        'FMMROA_YST_ENV':fmm1.iloc[0:24,1],
+        'FMMTJI_YST_ENV':fmm2.iloc[0:24,1]
+
+        })
+    
+if sistema2=='ERCOT':
+    ivyimp=rtrans('SIN',1,'y',1)
+    omsimp=rtrans('SIN',11,'y',2)
+    ivy=rtrans('SIN',22,'n',5)
+    oms=rtrans('SIN',30,'n',6)
+    filea='Ercot_Afternoon.xlsx'
+    
+    df=pd.DataFrame({
+        'PML_LAA': ivymda.iloc[0:24,2],
+        'PML_RRD': omsmda.iloc[0:24,2],
+        'DA_DCL': ah1.iloc[0:24,4],
+        'DA_DCR': ah2.iloc[0:24,4],
+        'FMM_DCL': froa.iloc[0:24,1],
+        'FMM_DCR': ftji.iloc[0:24,1],
+        'LAA_IMP_MP':ivyimp.iloc[0:24,0],
+        'LAA_IMP_MW':ivyimp.iloc[0:24,1],
+        'LAA_IMP_PR':ivyimp.iloc[0:24,2],
+        'LAA_MP':ivy.iloc[0:24,0],
+        'LAA_MW':ivy.iloc[0:24,1],
+        'LAA_PR':ivy.iloc[0:24,2],
+        'RRD_IMP_MP':omsimp.iloc[0:24,0],
+        'RRD_IMP_MW':omsimp.iloc[0:24,1],
+        'RRD_IMP_PR':omsimp.iloc[0:24,2],
+        'RRD_MP':oms.iloc[0:24,0],
+        'RRD_MW':oms.iloc[0:24,1],
+        'RRD_PR':oms.iloc[0:24,2],
+        'DADCL_TDY_ENV':da1.iloc[0:24,2],
+        'DADCl_NXT_ENV':da1.iloc[0:24,3],
+        'DADCR_TDY_ENV':da2.iloc[0:24,2],   
+        'DADCR_NXT_ENV':da2.iloc[0:24,3],  
+        'RTDCL_TDY_ENV':fmm1.iloc[0:24,2],
+        'RTDCL_NXT_ENV':fmm1.iloc[0:24,3],
+        'RTDCR_TDY_ENV':fmm2.iloc[0:24,2],   
+        'RTDCR_NXT_ENV':fmm2.iloc[0:24,3],
+        'Tipo de cambio': tipo_de_cambio,
+        'IMPO-ASIGNADA-LAA-MDA (M)':df_LAA.iloc[0:24,2],
+        'EXPO-ASIGNADA-LAA-MDA (M)':df_LAA.iloc[0:24,7],
+        'IMPO-ASIGNADA-RRD-MDA (M)':df_RRD.iloc[0:24,2],
+        'EXPO-ASIGNADA-RRD-MDA (M)':df_RRD.iloc[0:24,7],
+        'RTDCL_YST_ENV':fmm1.iloc[0:24,1],
+        'RTDCR_YST_ENV':fmm2.iloc[0:24,1]
+        })
+    
+    
+   
+wb = xw.Book(f"C:\\Users\\Administrator\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS-OPS\\Afternoon\\{filea}")
+sht1 = wb.sheets['Data']
+sht1.range('A1').value=df
+time.sleep(20)
+wb.app.quit()

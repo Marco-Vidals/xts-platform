@@ -1,0 +1,151 @@
+import numpy as np
+import pandas as pd
+import requests
+import json
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import xlwings as xw
+import random
+import lxml
+import urllib.request
+import shutil
+import re
+import os
+import pytemperature
+import pyodbc
+from datetime import datetime
+from selenium.webdriver.common.by import By
+from selenium import webdriver
+from selenium.webdriver.common.action_chains import ActionChains
+
+serv='ec2-34-203-113-74.compute-1.amazonaws.com'
+bd='XTS'
+usuario='sa'
+password='XTSoperations7530159'
+
+crear=0
+accion=0
+ffecha=0
+#Para acci├│n: actualizar = 1 , insertar=0
+#Para fecha: hoy=0 , d├¡as anteriores=1
+
+conx=pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server}; SERVER='+serv+';\
+                    DATABASE='+bd+';UID='+usuario+'; PWD='+password,autocommit=True)
+a=conx.cursor()
+
+
+# if ffecha==0:
+dby=datetime.today()-timedelta(days=2)
+dby2=dby.strftime('%d/%m/%Y')
+pddate=dby.strftime('%Y%m%d')
+
+fp = webdriver.FirefoxProfile()
+# Definir el directorio de descarga
+fp.set_preference("browser.download.folderList", 2)
+fp.set_preference("browser.download.manager.showWhenStarting", False)
+fp.set_preference("browser.download.dir", "C:/Users/xiixt/Documents/XTS/APP")  # Cambia esta ruta a tu directorio deseado
+fp.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream,application/vnd.ms-excel")
+
+# Desactivar la propiedad navigator.webdriver para evitar detecci├│n
+fp.set_preference("dom.webdriver.enabled", False)
+fp.set_preference("dom.webnotifications.enabled", False)
+fp.set_preference("media.navigator.enabled", False)
+
+# Opciones adicionales
+options = webdriver.FirefoxOptions()
+options.profile = fp
+options.set_preference("dom.webdriver.enabled", False)
+options.set_preference("useAutomationExtension", False)
+options.set_preference("general.useragent.override", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0")
+
+driver = webdriver.Firefox(options=options)
+driver.get('https://www.amm.org.gt/portal/?page_id=145')
+time.sleep(random.uniform(4,8))
+
+try:
+    # Cambiar al iframe
+    driver.switch_to.frame(driver.find_element('xpath',"//iframe[@src='https://www.amm.org.gt/diarios-vwp.php']"))
+    bca=driver.find_element('xpath','//select[@id="informes"]')
+    time.sleep(random.uniform(1,3))
+    bca.click()
+    bca2=driver.find_element('xpath','//option[2]')
+    time.sleep(random.uniform(1,3))
+    bca2.click()
+    
+    time.sleep(random.uniform(1,3))
+    # Seleccionar fecha
+    dia = dby.day
+    fecha_a_seleccionar = f"{dia}"
+    fecha = driver.find_element(By.XPATH, f"//a[text()='{fecha_a_seleccionar}']")
+    ActionChains(driver).move_to_element(fecha).click().perform()
+    
+    #Descargar documento
+    time.sleep(2)
+    dl=driver.find_element('xpath',"//span[@class='ui-button-text' and text()='Ver Documento']")
+    time.sleep(5)
+    dl.click()
+    
+    # Renombrar el archivo
+    ruta_original = os.path.join('C:\\Users\\xiixt\\Downloads', f'PD{pddate}.zip')
+    resul = os.path.join('"C:\\Users\\xiixt\\Documents\\XTS\\APP"', 'poe.zip')
+    os.rename(ruta_original, resul)
+    
+except Exception as e: 
+    # Cambiar al contexto principal (fuera del iframe) si es necesario
+    driver.switch_to.default_content()
+    print(f"Error {e}")
+    resultados='https://www.amm.org.gt/ultpub/'
+    url=requests.get('https://www.amm.org.gt/ultpub/ultimas_pub_resul.php').text
+    soup=BeautifulSoup(url,'lxml')
+    ref=(soup.find('a')).get('href')
+    resul='poe.zip'
+    
+time.sleep(3)
+driver.close()
+
+# Descomprimir el archivo
+try:
+    with zipfile.ZipFile(resul, 'r') as archivo_zip:
+        lista_archivos = archivo_zip.namelist()
+        nombre_excel = next((archivo for archivo in lista_archivos if archivo.endswith('.xlsx')), None)
+    
+        if nombre_excel:
+            archivo_zip.extract(nombre_excel)
+            ruta = os.path.join(nombre_excel)
+            poe = pd.read_excel(ruta,sheet_name="POE",skiprows=5)
+    
+        else:
+            print("No se encontr├│ ning├║n archivo Excel (.xlsx) en el archivo ZIP.")
+        
+        fecha_texto = ruta[:-5]
+
+        meses = {
+            "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
+            "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+            "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12
+        }
+        
+        dia, mes, a├▒o = fecha_texto.split()
+        mes_numero = meses[mes.lower()]
+        b = datetime(int(a├▒o), mes_numero, int(dia))
+
+except Exception as e:
+    print(e)
+    
+c=[0 for i in range(24)]
+for i in range(0,24):
+    c[i]=b+timedelta(hours=i)
+
+try:
+    consulta= 'insert into POE (fecha,POE,Generador) values(?,?,?)'
+    for i in range(0,24):
+        a.execute(consulta,c[i],poe.iloc[i,5],poe.iloc[i,4])
+except Exception as e:
+    consulta = 'update POE set POE=?, Generador=? where fecha=?'
+    for i in range(0,24):
+        a.execute(consulta,poe.iloc[i,5],poe.iloc[i,4],c[i])
+    print(e)
+
+

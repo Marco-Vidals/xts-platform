@@ -1,0 +1,104 @@
+import pyodbc 
+import pandas as pd
+import requests
+import json
+from selenium.webdriver.common.by import By
+import pytemperature
+from datetime import timedelta
+from bs4 import BeautifulSoup
+import zipfile
+import time
+import lxml
+import urllib.request
+import shutil
+import re
+import os
+import datetime
+import numpy as np
+
+def ercotrt(dias):
+    url='https://www.ercot.com/misapp/GetReports.do?reportTypeId=12301&reportTitle=Settlement%20Point%20Prices%20at%20Resource%20Nodes%20Hubs%20and%20Load%20Zones&showHTMLView=&mimicKey'
+    link=requests.get(url).text
+    soup=BeautifulSoup(link,'html.parser')
+    names=[]
+    urls=[]
+    for a in soup.find_all(class_='labelOptional_ind'):
+        names.append(a.text)
+    
+    for a in soup.find_all('a'):
+        ref=a.get('href')
+        urls.append(ref)
+        
+    hoy=datetime.date.today()-timedelta(days=dias)
+    fin=hoy+timedelta(days=1)
+    hoy=hoy.strftime('%Y%m%d')
+    fin=f'{fin.strftime("%Y%m%d")}.0002'
+    salida='ercotrt'
+    
+    df=pd.DataFrame(zip(names,urls),columns=['Nombre','Links'])
+    label=soup.find(class_='labelOptional_ind').text
+    name=label[0:30]
+    file=f'{name}{hoy}.0017'
+    ffinal=f'{name}{fin}'
+    
+    ldcl=[]
+    ldcr=[]
+    for i in range(0,len(df),2):
+        a=(df.iloc[i,0])[0:38]
+        b=df.iloc[i,1]
+        c=df.iloc[i,0]
+        if c[30:38]==hoy or c[30:43]==fin:
+            descarga=f'https://www.ercot.com/{b}'
+            kk=f'{salida}.zip'
+            with urllib.request.urlopen(descarga) as response, open(kk,'wb') as out_solar:
+                shutil.copyfileobj(response,out_solar)
+            with zipfile.ZipFile(kk, 'r') as zip_ref:
+                file_names = zip_ref.namelist()
+                for file_name in file_names:
+                   if file_name.endswith('.csv'): 
+                       (f'El archivo csv es: {file_name}') 
+    
+            with zipfile.ZipFile(f'C:\\Windows\\SYSTEM32\\{salida}.zip','r') as zip_ref:
+                zip_ref.extractall(f'C:\\Windows\\SYSTEM32')
+    
+            solar_csv=os.path.join(f'C:\\Windows\\SYSTEM32\\{file_name}')
+            new=os.path.join(f'C:\\Windows\\SYSTEM32\\{salida}.csv')
+            shutil.move(solar_csv,new)
+            data=pd.read_csv(f'{salida}.csv')
+            dcl=data[data['SettlementPointName'].isin(['DC_L']) & \
+                     data['SettlementPointType'].isin(['LZ_DCEW'])]
+            dcr=data[data['SettlementPointName'].isin(['DC_R']) & \
+                     data['SettlementPointType'].isin(['LZ_DCEW'])] 
+            ldcl.append(dcl)
+            ldcr.append(dcr)
+            if c[0:43]==file:
+                break
+    
+    
+    columnas=['Date','Hour','Interval','Nodo','Type','Price','DSTFlag']
+    dfl=np.array(ldcl)
+    
+    dfl=(pd.DataFrame(dfl.reshape((-1,dfl.shape[-1] ))))
+    dfl.columns=columnas
+    dfl=dfl.sort_values(by=['Hour'], ascending=True)
+    dfl_u=(dfl.iloc[:,5]).groupby(np.arange(len(dfl))//4).mean()
+    na=[pd.NA for i in range(24-len(dfl_u))]
+    ceros=pd.DataFrame(na)
+    
+    
+    dfr=np.array(ldcr)
+    dfr=(pd.DataFrame(dfr.reshape((-1,dfr.shape[-1] ))))
+    dfr.columns=columnas
+    dfr=dfr.sort_values(by=['Hour'], ascending=True)
+    dfr_u=(dfr.iloc[:,5]).groupby(np.arange(len(dfr))//4).mean()
+    
+    if 24-len(dfl_u)>0:
+        dfr_u=pd.concat([dfr_u, ceros],axis=0)
+        dfr_u=dfr_u.reset_index()
+        dfl_u=pd.concat([dfl_u, ceros],axis=0)
+        dfl_u=dfl_u.reset_index()
+    
+    return dfl_u, dfr_u
+
+
+#p1=ercotrt(5)
