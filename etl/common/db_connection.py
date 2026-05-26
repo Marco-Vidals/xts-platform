@@ -27,6 +27,17 @@ def _load_env_once():
 _load_env_once()
 
 
+def _best_driver():
+    """Devuelve el mejor ODBC driver disponible en este sistema."""
+    available = [d for d in pyodbc.drivers() if "SQL Server" in d]
+    for preferred in ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server"]:
+        if preferred in available:
+            return preferred
+    if available:
+        return available[0]
+    return "ODBC Driver 17 for SQL Server"
+
+
 def get_connection(database="XTS"):
     """
     Retorna conexion a SQL Server usando variables de entorno o valores por defecto.
@@ -34,16 +45,17 @@ def get_connection(database="XTS"):
     Variables de entorno:
         XTS_DB_SERVER   - hostname o IP del servidor (default: 100.70.216.12)
         XTS_DB_PORT     - puerto (default: 1433)
-        XTS_DB_USER     - usuario (default: xts_app)
+        XTS_DB_USER     - usuario (default: sa)
         XTS_DB_PASSWORD - password
     """
     server = os.environ.get("XTS_DB_SERVER", "100.70.216.12")
     port = os.environ.get("XTS_DB_PORT", "1433")
     user = os.environ.get("XTS_DB_USER", "sa")
     password = os.environ.get("XTS_DB_PASSWORD", "")
+    driver = os.environ.get("DB_DRIVER", _best_driver())
 
     conn_str = (
-        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"DRIVER={{{driver}}};"
         f"SERVER={server},{port};"
         f"DATABASE={database};"
         f"UID={user};"

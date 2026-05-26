@@ -258,7 +258,7 @@ def _load_ecd(ini: date, fin: date) -> dict:
 def _load_trades() -> pd.DataFrame:
     try:
         import pyodbc
-        DB = ("DRIVER={ODBC Driver 17 for SQL Server};"
+        DB = ("DRIVER={ODBC Driver 18 for SQL Server};"
               "SERVER=100.70.216.12;DATABASE=XTS;"
               "UID=sa;PWD=XTS_operations.XiiX;Connection Timeout=10;")
         conn = pyodbc.connect(DB)

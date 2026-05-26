@@ -273,7 +273,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv(os.path.join(_SCRIPT_DIR, "..", "Extractors", ".env"))
     _conn = pyodbc.connect(
-        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"DRIVER={{ODBC Driver 18 for SQL Server}};"
         f"SERVER={os.environ.get('XTS_DB_SERVER','100.70.216.12')},{os.environ.get('XTS_DB_PORT','1433')};"
         f"DATABASE={os.environ.get('XTS_DB_NAME','XTS')};"
         f"UID={os.environ.get('XTS_DB_USER','sa')};"
