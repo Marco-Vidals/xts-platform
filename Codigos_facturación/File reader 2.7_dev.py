@@ -268,7 +268,24 @@ xiix_liq['Periodo ECD'] = pd.to_datetime(xiix_liq['Periodo ECD'], format='%d/%m/
 xiix_liq['Fecha Limite de Pago'] = xiix_liq['Periodo ECD'].apply(get_date)
 xiix_liq['Fecha Limite de Pago'] = np.where(xiix_liq['Tipo'] == 'Credito', xiix_liq['Fecha Limite de Pago'] - pd.Timedelta(days=7), xiix_liq['Fecha Limite de Pago'])
 xiix_liq['Fecha Limite de Pago'] = xiix_liq['Fecha Limite de Pago'].dt.strftime('%d/%m/%Y')
-lista_fufs = pd.read_excel(os.path.join(BASE_FAC, 'Scripts', 'LISTA_FUF_XIIX.xlsx'))
+try:
+    import pyodbc
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(_SCRIPT_DIR, "..", "Extractors", ".env"))
+    _conn = pyodbc.connect(
+        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"SERVER={os.environ.get('XTS_DB_SERVER','100.70.216.12')},{os.environ.get('XTS_DB_PORT','1433')};"
+        f"DATABASE={os.environ.get('XTS_DB_NAME','XTS')};"
+        f"UID={os.environ.get('XTS_DB_USER','sa')};"
+        f"PWD={os.environ.get('XTS_DB_PASSWORD','')};"
+        f"TrustServerCertificate=yes;"
+    )
+    lista_fufs = pd.read_sql("SELECT FUF, UUDI, SERIE, FOLIO FROM facturacion.lista_fuf", _conn)
+    _conn.close()
+    print(f"✓ LISTA_FUF cargada desde DB: {len(lista_fufs)} registros")
+except Exception as _e:
+    print(f"⚠️  DB no disponible ({_e}), usando Excel local como fallback")
+    lista_fufs = pd.read_excel(os.path.join(BASE_FAC, 'Scripts', 'LISTA_FUF_XIIX.xlsx'))
 lista_fufs.reset_index(drop=True, inplace=True)
 xiix_liq['FUF_O'] = xiix_liq['No. Identificacion'].str[:8]+ xiix_liq['FUF'].str[8:16]+'00'
 xiix_liq['Participante'] = xiix_liq['FUF'].str[8:15]

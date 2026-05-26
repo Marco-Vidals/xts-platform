@@ -89,8 +89,22 @@ _CUENTAS = {
     "SIN": ["SIN-M024ELA", "SIN-M024ERD", "SIN-M024EGT", "SIN-M024IGT"],
 }
 
+# ── DB connection helper ──────────────────────────────────────────────────────
+def _get_conn():
+    import pyodbc
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Extractors", ".env"))
+    return pyodbc.connect(
+        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"SERVER={os.environ.get('XTS_DB_SERVER','100.70.216.12')},{os.environ.get('XTS_DB_PORT','1433')};"
+        f"DATABASE={os.environ.get('XTS_DB_NAME','XTS')};"
+        f"UID={os.environ.get('XTS_DB_USER','sa')};"
+        f"PWD={os.environ.get('XTS_DB_PASSWORD','')};"
+        f"TrustServerCertificate=yes;"
+    )
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_resumen, tab_flujo = st.tabs(["Resumen", "Flujo Semanal"])
+tab_resumen, tab_flujo, tab_fuf = st.tabs(["Resumen", "Flujo Semanal", "Lista FUF"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 0 — Resumen Facturación
@@ -235,3 +249,71 @@ with tab_flujo:
                     st.error("Tiempo límite excedido (10 min). Revisa los logs.")
                 except Exception as e:
                     st.error(f"Error: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB — Lista FUF
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_fuf:
+    st.markdown("### Lista FUF — Folios Fiscales")
+    st.markdown(
+        "<div style='color:#5a6280;font-size:0.8rem;margin-bottom:16px;'>"
+        "Tabla de FUFs con UUID, Serie y Folio usada para generar facturas y notas. "
+        "Sube un Excel con columnas FUF, UUDI, SERIE, FOLIO para agregar o actualizar registros.</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Tabla actual ──────────────────────────────────────────────────────────
+    try:
+        conn = _get_conn()
+        df_fuf = pd.read_sql("SELECT FUF, UUDI, SERIE, FOLIO FROM facturacion.lista_fuf ORDER BY FUF DESC", conn)
+        conn.close()
+        st.markdown(f"**{len(df_fuf):,} registros en base de datos**")
+        st.dataframe(df_fuf.head(100), use_container_width=True, hide_index=True)
+        if len(df_fuf) > 100:
+            st.caption(f"Mostrando primeros 100 de {len(df_fuf):,}")
+    except Exception as e:
+        st.error(f"No se pudo cargar la tabla: {e}")
+
+    st.divider()
+
+    # ── Uploader ──────────────────────────────────────────────────────────────
+    st.markdown("#### Actualizar Lista FUF")
+    uploaded = st.file_uploader(
+        "Sube el Excel actualizado (columnas: FUF, UUDI, SERIE, FOLIO)",
+        type=["xlsx", "xls"],
+        key="fuf_uploader"
+    )
+
+    if uploaded is not None:
+        try:
+            df_new = pd.read_excel(uploaded)
+            df_new.columns = [c.strip().upper() for c in df_new.columns]
+            required = {"FUF", "UUDI", "SERIE", "FOLIO"}
+            if not required.issubset(set(df_new.columns)):
+                st.error(f"El Excel debe tener las columnas: {required}. Encontradas: {set(df_new.columns)}")
+            else:
+                st.markdown(f"**{len(df_new):,} registros en el archivo.** Vista previa:")
+                st.dataframe(df_new.head(10), use_container_width=True, hide_index=True)
+
+                if st.button("💾 Guardar en base de datos", key="btn_save_fuf"):
+                    with st.spinner("Actualizando..."):
+                        conn = _get_conn()
+                        cursor = conn.cursor()
+                        inserted = updated = 0
+                        for _, row in df_new.iterrows():
+                            folio_val = int(row.FOLIO) if pd.notna(row.FOLIO) and str(row.FOLIO).replace('.0','').isdigit() else None
+                            cursor.execute("""
+                                IF EXISTS (SELECT 1 FROM facturacion.lista_fuf WHERE FUF=?)
+                                    UPDATE facturacion.lista_fuf SET UUDI=?, SERIE=?, FOLIO=? WHERE FUF=?
+                                ELSE
+                                    INSERT INTO facturacion.lista_fuf (FUF,UUDI,SERIE,FOLIO) VALUES (?,?,?,?)
+                            """, row.FUF, row.UUDI, row.SERIE, folio_val, row.FUF,
+                                row.FUF, row.UUDI, row.SERIE, folio_val)
+                        conn.commit()
+                        cursor.execute("SELECT COUNT(*) FROM facturacion.lista_fuf")
+                        total = cursor.fetchone()[0]
+                        conn.close()
+                        st.success(f"Lista FUF actualizada. Total en DB: {total:,} registros.")
+                        st.rerun()
+        except Exception as e:
+            st.error(f"Error al procesar el archivo: {e}")
