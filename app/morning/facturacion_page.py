@@ -95,7 +95,11 @@ tab_resumen, tab_flujo = st.tabs(["Resumen", "Flujo Semanal"])
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 0 — Resumen Facturación
 # ═══════════════════════════════════════════════════════════════════════════════
-FACTURACION_BASE = r"C:\Users\xiixt\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\XTS R&D\Facturacion"
+_PAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+FACTURACION_BASE = os.environ.get(
+    "FACTURACION_BASE",
+    os.path.normpath(os.path.join(_PAGE_DIR, "..", "..", "Facturacion"))
+)
 PATH_FACTURAS = os.path.join(FACTURACION_BASE, "XiiXFacturas.csv")
 PATH_NOTAS    = os.path.join(FACTURACION_BASE, "XiiXNotas.xlsx")
 
@@ -203,14 +207,31 @@ with tab_flujo:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    if st.button("▶  Correr Flujo Semanal", key="btn_run_weekly"):
-        try:
-            script = os.path.normpath(RUN_WEEKLY)
-            subprocess.Popen(
-                [_sys.executable, script],
-                creationflags=subprocess.CREATE_NEW_CONSOLE,
-                cwd=os.path.dirname(script),
-            )
-            st.success("Terminal abierta — sigue las instrucciones en la ventana de comando.")
-        except Exception as e:
-            st.error(f"Error al abrir terminal: {e}")
+    st.info("Corre los pasos 1-3 (Descarga, Organización y Extracción de EDCs). "
+            "Los pasos 4-5 (Facturas y Notas) requieren número de folio — córrelos localmente.")
+
+    if st.button("▶  Correr Pasos 1-3 (Descarga y Extracción)", key="btn_run_weekly"):
+        script = os.path.normpath(RUN_WEEKLY)
+        if not os.path.exists(script):
+            st.error(f"No se encontró run_weekly.py en: {script}")
+        else:
+            with st.spinner("Corriendo pasos 1-3... puede tardar varios minutos."):
+                try:
+                    result = subprocess.run(
+                        [_sys.executable, script, "--desde", "1", "--hasta", "3"],
+                        capture_output=True, text=True,
+                        cwd=os.path.dirname(script),
+                        timeout=600,
+                    )
+                    if result.returncode == 0:
+                        st.success("Pasos 1-3 completados.")
+                    else:
+                        st.error("El flujo terminó con errores.")
+                    if result.stdout:
+                        st.code(result.stdout[-4000:], language=None)
+                    if result.stderr:
+                        st.code(result.stderr[-2000:], language=None)
+                except subprocess.TimeoutExpired:
+                    st.error("Tiempo límite excedido (10 min). Revisa los logs.")
+                except Exception as e:
+                    st.error(f"Error: {e}")

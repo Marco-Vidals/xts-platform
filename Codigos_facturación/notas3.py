@@ -1,0 +1,274 @@
+import pandas as pd
+import requests
+import datetime
+from datetime import timedelta
+import numpy as np
+import json
+
+
+
+def notas(rango,f,folio):
+    for i in range(rango,rango+1):
+        #print(folio)
+        if f['Tipo'][i]=='NC':
+            t_doc='2'
+            t_comp='E'
+            t_rel='01'
+        else:
+            t_doc='3'
+            t_comp='I'
+            t_rel='02'
+        
+        
+        folio=int(folio)+1
+        print(folio)
+        dia=datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        periodo=(str(f['Periodo ECD'][i]))
+        limite=str(f['Fecha Limite de Pago'][i])
+        perecd=f"{periodo[8:10]}-{periodo[5:7]}-{periodo[0:4]}"
+        flimite=f"{limite[:2]}-{limite[3:5]}-{limite[6:]}"
+        perecd2=f"{periodo[0:4]}-{periodo[5:7]}-{periodo[8:10]}"
+        flimite2=f"{limite[6:]}-{limite[3:5]}-{limite[0:2]}"
+        body= u"""{
+       "user": "XTS191120H32",
+       "password": "portalxiix",
+       "datosAdicionales": {
+        "DocumentoNota": \"Periodo ECD:"""+perecd+""" Factura (FUF):"""+f['FUF'][i]+""" Fecha Limite de Pago:"""+flimite+""" ID Participante:"""+f['Participante'][i]+""" Correo:escuderop@xiix.mx Ref. Banco:"""+f['FUF'][i]+""" Sucursal:0031 Banco:BBVA Cuenta:0114254848 CLABE:012180001142548489\",
+        "TipoDeComprobante": \""""+f['Tipo'][i]+"""\" ,
+        "LABEL": "CABADD",
+        "TIPO_DOC": \""""+t_doc+"""\",
+        "CODIGO_FUF": \""""+f['FUF'][i]+"""\",
+        "PERIODO_ECD": \""""+perecd2+"""\",
+        "FECHA_LIM_PAGO": \""""+flimite2+"""\",
+        "ID_PARTIC_CENACE": \""""+f['Participante'][i]+"""\",
+        "BANCO": "BBVA",
+        "SUCURSAL": "0031",
+        "CUENTA": "0114254848",
+        "CLABE": "012180001142548489",
+        "REF_BANCO": \""""+f['FUF'][i]+"""\",
+        "CONTACTO": "escuderop@xiix.mx",
+        "NUM_LIN_0": "1",
+        "LABEL_0": "LINADD",
+        "FOLIO_UNICO_0": \"""" + str(f['No. Identificacion'][i]) + """\",
+        "IMPORTE_MODF_0": \"""" + str(round(f['Importe Modificado'][i], 2)) + """\",
+        "MONTO_AJUSTE_0": \"""" + str(round(f['Monto Ajuste'][i], 2)) + """\",
+        "IMPORTE_ORIG_0": \"""" + str(round(f['Importe Original'][i], 2)) + """\",
+        "NUM_LIN_1": "2",
+        "LABEL_1": "LINADD",
+        "FOLIO_UNICO_1": \"""" + str(f['No. Identificacion'][i + 1]) + """\",
+        "IMPORTE_MODF_1": \"""" + str(round(f['Importe Modificado'][i + 1], 2)) + """\",
+        "MONTO_AJUSTE_1": \"""" + str(round(f['Monto Ajuste'][i + 1], 2)) + """\",
+        "IMPORTE_ORIG_1": \"""" + str(round(f['Importe Original'][i + 1], 2)) + """\",
+        "NUM_LIN_2": "3",
+        "LABEL_2": "LINADD",
+        "FOLIO_UNICO_2": \"""" + str(f['No. Identificacion'][i + 2]) + """\",
+        "IMPORTE_MODF_2": \"""" + str(round(f['Importe Modificado'][i + 2], 2)) + """\",
+        "MONTO_AJUSTE_2": \"""" + str(round(f['Monto Ajuste'][i + 2], 2)) + """\",
+        "IMPORTE_ORIG_2": \"""" + str(round(f['Importe Original'][i + 2], 2)) + """\"
+      },
+      "Comprobante": {
+        "Exportacion": "01",
+        "Serie": \""""+f['Tipo'][i]+"""\",
+        "Folio": \""""+str(folio)+"""\",
+        "Fecha": \""""+str(dia)+"""\",
+        "SubTotal": \""""+str(round((f['Subtotal'][i])+(f['Subtotal'][i+1])+(f['Subtotal'][i+2]),2))+"""\",
+        "Moneda": "MXN",
+        "Total": \""""+str(round((f['TOTAL'][i])+(f['TOTAL'][i+1])+(f['TOTAL'][i+2]),2))+"""\",
+        "TipoDeComprobante": \""""+t_comp+"""\",
+        "FormaPago": "99",
+        "MetodoPago": "PPD",
+        "CondicionesDePago": "60 DIAS (TUA)",
+        "Descuento": \""""+str(round(f['Descuento'][i],2))+"""\",
+        "TipoCambio": "1",
+        "LugarExpedicion": "05348",
+        "Confirmacion": "",
+        "Version": "4.0",
+        "InformacionGlobal": {
+          "Periodicidad": "",
+          "Meses": "",
+          "Anio": ""
+        },
+        "CfdiRelacionados": [
+          {
+            "TipoRelacion": \""""+t_rel+"""\",
+            "CfdiRelacionado": [
+              {
+                "UUID": \""""+f['Folio Fiscal'][i]+"""\"
+              }
+            ]
+          }
+        ],
+        "Emisor": {
+          "Rfc": "XTS191120H32",
+          "Nombre": "XIIX TRADING SOLUTIONS",
+          "RegimenFiscal": "601"
+        },
+        "Receptor": {
+          "email": "",
+          "numInt": "",
+          "municipio": "ALVARO OBREGON",
+          "colonia": "LOS ALPES",
+          "estado": "MEXICO",
+          "calle": "BOULEVARD ADOLFO LOPEZ MATEOS",
+          "pais": "MEX",
+          "Rfc": "CNC140828PQ4",
+          "Nombre": "CENTRO NACIONAL DE CONTROL DE ENERGIA",
+          "ResidenciaFiscal": "",
+          "NumRegIdTrib": "",
+          "UsoCFDI": "G01",
+          "Pais": "MEX",
+          "Estado": "MEXICO",
+          "Municipio": "ALVARO OBREGON",
+          "codigoPostal": "01010",
+          "Colonia": "LOS ALPES",
+          "NumInt": "",
+          "noExterior": "2157",
+          "Calle": "BOULEVARD ADOLFO LOPEZ MATEOS",
+          "RegimenFiscalReceptor": "603",
+          "DomicilioFiscalReceptor": "01010"
+        },
+        "Conceptos": {
+          "Concepto": [
+            {
+              "ClaveProdServ": "83101800",
+              "NoIdentificacion": \""""+f['No. Identificacion'][i]+"""\",
+              "ClaveUnidad": \""""+f['ClaveUnidad'][i]+"""\",
+              "Unidad": \""""+f['Unidad'][i]+"""\",
+              "Descripcion": \""""+f['Descripcion'][i]+"""\",
+              "Importe": \""""+str(round(f['Importe'][i],2))+"""\",
+              "Cantidad": \""""+str(round(f['Cantidad'][i],2))+"""\",
+              "ValorUnitario": \""""+str(round(f['Precio Unitario'][i],2))+"""\",
+              "IMPORTE_ORIG": \""""+str(round(f['Importe Original'][i],2))+"""\",
+              "IMPORTE_MODF": \""""+str(round(f['Importe Modificado'][i],2))+"""\",
+              "MONTO_AJUSTE": \""""+str(round(f['Monto Ajuste'][i],2))+"""\",
+              "Descuento": \""""+str(f['Descuento'][i])+"""\",
+              "ObjetoImp": "02",
+              "Impuestos": {
+                "Traslados": {
+                  "Traslado": [
+                    {
+                      "Impuesto": "002",
+                      "TasaOCuota": "0.160000",
+                      "Importe": \""""+str(round(f['Importe'][i]*0.16,2))+"""\",
+                      "TipoFactor": "Tasa",
+                      "Base": \""""+str(round(f['Importe'][i],2))+"""\"
+                    }
+                  ]
+                },
+                "Retenciones": {
+                  "Retencion": [
+                    
+                  ]
+                }
+              },
+              "InformacionAduanera": null
+            },
+            {
+               "ClaveProdServ": "83101800",
+               "NoIdentificacion": \""""+f['No. Identificacion'][i+1]+"""\",
+               "ClaveUnidad": \""""+f['ClaveUnidad'][i+1]+"""\",
+               "Unidad": \""""+f['Unidad'][i+1]+"""\",
+               "Descripcion": \""""+f['Descripcion'][i+1]+"""\",
+               "Importe": \""""+str(round(f['Importe'][i+1],2))+"""\",
+               "Cantidad": \""""+str(round(f['Cantidad'][i+1],2))+"""\",
+               "ValorUnitario": \""""+str(round(f['Precio Unitario'][i+1],2))+"""\",
+               "IMPORTE_ORIG": \""""+str(round(f['Importe Original'][i+1],2))+"""\",
+               "IMPORTE_MODF": \""""+str(round(f['Importe Modificado'][i+1],2))+"""\",
+               "MONTO_AJUSTE": \""""+str(round(f['Monto Ajuste'][i+1],2))+"""\",
+               "Descuento": \""""+str(f['Descuento'][i+1])+"""\",
+               "ObjetoImp": "02",
+               "Impuestos": {
+                 "Traslados": {
+                   "Traslado": [
+                     {
+                       "Impuesto": "002",
+                       "TasaOCuota": "0.160000",
+                       "Importe": \""""+str(round(f['Importe'][i+1]*0.16,2))+"""\",
+                       "TipoFactor": "Tasa",
+                       "Base": \""""+str(round(f['Importe'][i+1],2))+"""\"
+                     }
+                   ]
+                 },
+                 "Retenciones": {
+                   "Retencion": [
+                     
+                   ]
+                 }
+               },
+               "InformacionAduanera": null
+             },
+             {
+               "ClaveProdServ": "83101800",
+               "NoIdentificacion": \""""+f['No. Identificacion'][i+2]+"""\",
+               "ClaveUnidad": \""""+f['ClaveUnidad'][i+2]+"""\",
+               "Unidad": \""""+f['Unidad'][i+2]+"""\",
+               "Descripcion": \""""+f['Descripcion'][i+2]+"""\",
+               "Importe": \""""+str(round(f['Importe'][i+2],2))+"""\",
+               "Cantidad": \""""+str(round(f['Cantidad'][i+2],2))+"""\",
+               "ValorUnitario": \""""+str(round(f['Precio Unitario'][i+2],2))+"""\",
+               "IMPORTE_ORIG": \""""+str(round(f['Importe Original'][i+2],2))+"""\",
+               "IMPORTE_MODF": \""""+str(round(f['Importe Modificado'][i+2],2))+"""\",
+               "MONTO_AJUSTE": \""""+str(round(f['Monto Ajuste'][i+2],2))+"""\",
+               "Descuento": \""""+str(f['Descuento'][i+2])+"""\",
+               "ObjetoImp": "02",
+               "Impuestos": {
+                 "Traslados": {
+                   "Traslado": [
+                     {
+                       "Impuesto": "002",
+                       "TasaOCuota": "0.160000",
+                       "Importe": \""""+str(round(f['Importe'][i+2]*0.16,2))+"""\",
+                       "TipoFactor": "Tasa",
+                       "Base": \""""+str(round(f['Importe'][i+2],2))+"""\"
+                     }
+                   ]
+                 },
+                 "Retenciones": {
+                   "Retencion": [
+                     
+                   ]
+                 }
+               },
+               "InformacionAduanera": null
+             }  
+          ]
+        },
+        "Impuestos": null,
+        "TimbreFiscalDigital": null,
+        "Complemento": null
+      }
+            }"""
+        url='https://clickfactura.com.mx/api/timbrado/xml33/timbradorest/'
+        heads={
+            'Content-Type': 'application/json'
+            }
+        print(body)
+        print('¿Es correcta la nota?')
+        val=input('y/n:')
+        if val=='y':
+            response=requests.post(url,data=body, headers=heads)
+            print(response)
+            print(response.content)
+        if val=='n':
+            print('=================================================')
+            
+            print("        Esta nota no se subió")
+            
+            print('=================================================')
+            
+            print("")
+            print("Continuar con la siguiente: 1")
+            print("Detener el proceso: 2")
+            print("")
+            ok=input("Continuar/Detener:")
+            if ok=='1':
+                print('=======================================')
+                print("     Continuamos")
+                print('=======================================')
+                
+            if ok=='2':
+                print('=======================================')
+                print("     Se detuvo el envío")
+                print('=======================================')
+                break
+    return folio
