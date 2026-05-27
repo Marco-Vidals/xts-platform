@@ -212,85 +212,117 @@ with tab_flujo:
         "5 · Generar notas de crédito/débito",
     ]
 
+    def _run_script(cmd, label, timeout=600):
+        with st.spinner(f"{label}..."):
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True,
+                                   cwd=_FAC_DIR, timeout=timeout)
+                if r.returncode == 0:
+                    st.success(f"✓ {label} completado.")
+                else:
+                    st.error(f"✗ {label} terminó con errores.")
+                if r.stdout:
+                    st.code(r.stdout[-4000:], language=None)
+                if r.stderr:
+                    st.code(r.stderr[-2000:], language=None)
+                return r.returncode == 0
+            except subprocess.TimeoutExpired:
+                st.error(f"Tiempo límite excedido en {label}.")
+            except Exception as e:
+                st.error(f"Error en {label}: {e}")
+        return False
+
+    # ── ETAPA 1: Pasos 1-3 ────────────────────────────────────────────────────
+    st.markdown("#### Etapa 1 · Descarga y Extracción")
     st.markdown("##### Pasos disponibles")
-    for p in _PASOS_LABELS:
+    for p in _PASOS_LABELS[:3]:
         st.markdown(f"<div style='color:#c0c4cc;font-size:0.82rem;margin:2px 0;'>• {p}</div>",
                     unsafe_allow_html=True)
-
     st.markdown("<br>", unsafe_allow_html=True)
 
     col_d, col_h = st.columns(2)
     with col_d:
-        desde_paso = st.selectbox("¿Desde qué paso?", [1, 2, 3, 4, 5],
+        desde_paso = st.selectbox("¿Desde qué paso?", [1, 2, 3],
                                   format_func=lambda x: _PASOS_LABELS[x-1], key="desde_paso")
     with col_h:
-        hasta_paso = st.selectbox("¿Hasta qué paso?", [1, 2, 3, 4, 5],
-                                  index=4,
-                                  format_func=lambda x: _PASOS_LABELS[x-1], key="hasta_paso")
+        hasta_paso_1 = st.selectbox("¿Hasta qué paso?", [1, 2, 3],
+                                    index=2,
+                                    format_func=lambda x: _PASOS_LABELS[x-1], key="hasta_paso_1")
 
-    # Folio inputs solo si aplican
-    folio_fac = folio_notas = None
-    if desde_paso <= 4 <= hasta_paso:
-        st.markdown("<br>", unsafe_allow_html=True)
-        folio_fac = st.number_input("Folio inicial — Facturas", min_value=1, step=1,
-                                    value=1, key="folio_fac")
-    if desde_paso <= 5 <= hasta_paso:
-        folio_notas = st.number_input("Folio inicial — Notas de Crédito/Débito",
-                                      min_value=1, step=1, value=1, key="folio_notas")
+    if st.button(f"▶  Correr pasos {desde_paso}–{hasta_paso_1}", key="btn_run_extraccion"):
+        _run_script(
+            [_sys.executable, RUN_WEEKLY,
+             "--desde", str(desde_paso), "--hasta", str(hasta_paso_1)],
+            f"Pasos {desde_paso}–{hasta_paso_1}"
+        )
 
+    st.divider()
+
+    # ── ETAPA 2: Revisión ─────────────────────────────────────────────────────
+    st.markdown("#### Etapa 2 · Revisión")
+    st.caption("Revisa que los datos generados sean correctos antes de emitir.")
+
+    _col_f2, _col_n2 = st.columns(2)
+    with _col_f2:
+        st.markdown("**XiiXFacturas.csv**")
+        try:
+            _df_prev_fac = pd.read_csv(PATH_FACTURAS)
+            _cols_prev = [c for c in ["FUF","Participante","Periodo ECD","TOTAL"] if c in _df_prev_fac.columns]
+            st.dataframe(_df_prev_fac[_cols_prev], use_container_width=True, hide_index=True, height=220)
+            st.caption(f"{len(_df_prev_fac)} registros")
+        except FileNotFoundError:
+            st.info("Aún no existe — corre los pasos 1-3 primero.")
+        except Exception as e:
+            st.warning(f"No se pudo cargar: {e}")
+
+    with _col_n2:
+        st.markdown("**XiiXNotas.xlsx**")
+        try:
+            _df_prev_not = pd.read_excel(PATH_NOTAS)
+            _cols_prev_n = [c for c in ["FUF","Participante","Periodo ECD","TOTAL"] if c in _df_prev_not.columns]
+            st.dataframe(_df_prev_not[_cols_prev_n], use_container_width=True, hide_index=True, height=220)
+            st.caption(f"{len(_df_prev_not)} registros")
+        except FileNotFoundError:
+            st.info("Aún no existe — corre los pasos 1-3 primero.")
+        except Exception as e:
+            st.warning(f"No se pudo cargar: {e}")
+
+    confirmado = st.checkbox("✅  Las facturas y notas son correctas, proceder con la emisión",
+                             key="fac_confirmado")
+
+    st.divider()
+
+    # ── ETAPA 3: Emisión (Pasos 4-5) ──────────────────────────────────────────
+    st.markdown("#### Etapa 3 · Emisión en Click Factura")
+    for p in _PASOS_LABELS[3:]:
+        st.markdown(f"<div style='color:#c0c4cc;font-size:0.82rem;margin:2px 0;'>• {p}</div>",
+                    unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
-    if st.button(f"▶  Correr desde paso {desde_paso} hasta paso {hasta_paso}", key="btn_run_flujo"):
+    if not confirmado:
+        st.info("Revisa y confirma los datos en Etapa 2 para habilitar la emisión.")
+    else:
+        col_f4, col_n5 = st.columns(2)
+        with col_f4:
+            folio_fac = st.number_input("Folio inicial — Facturas",
+                                        min_value=1, step=1, value=1, key="folio_fac")
+        with col_n5:
+            folio_notas = st.number_input("Folio inicial — Notas",
+                                          min_value=1, step=1, value=1, key="folio_notas")
 
-        def _run(cmd, label, timeout=600):
-            with st.spinner(f"{label}..."):
-                try:
-                    r = subprocess.run(cmd, capture_output=True, text=True,
-                                       cwd=_FAC_DIR, timeout=timeout)
-                    if r.returncode == 0:
-                        st.success(f"✓ {label} completado.")
-                    else:
-                        st.error(f"✗ {label} terminó con errores.")
-                    if r.stdout:
-                        st.code(r.stdout[-4000:], language=None)
-                    if r.stderr:
-                        st.code(r.stderr[-2000:], language=None)
-                    return r.returncode == 0
-                except subprocess.TimeoutExpired:
-                    st.error(f"Tiempo límite excedido en {label}.")
-                except Exception as e:
-                    st.error(f"Error en {label}: {e}")
-            return False
+        desde_emision = st.selectbox("¿Desde qué paso emitir?", [4, 5],
+                                     format_func=lambda x: _PASOS_LABELS[x-1],
+                                     key="desde_emision")
 
-        ok = True
-
-        # Pasos 1-3 via run_weekly
-        if ok and desde_paso <= 3 and hasta_paso >= 1:
-            ok = _run(
-                [_sys.executable, RUN_WEEKLY,
-                 "--desde", str(desde_paso),
-                 "--hasta", str(min(3, hasta_paso))],
-                f"Pasos {desde_paso}–{min(3, hasta_paso)}"
-            )
-
-        # Paso 4 — Facturas
-        if ok and desde_paso <= 4 <= hasta_paso:
-            if folio_fac is None:
-                st.error("Ingresa el folio inicial para Facturas.")
-                ok = False
-            else:
-                ok = _run(
+        if st.button(f"▶  Emitir desde paso {desde_emision}", key="btn_emitir"):
+            ok = True
+            if desde_emision <= 4:
+                ok = _run_script(
                     [_sys.executable, SCRIPT_FAC, "--folio", str(int(folio_fac))],
                     "Paso 4 — Facturas"
                 )
-
-        # Paso 5 — Notas
-        if ok and desde_paso <= 5 <= hasta_paso:
-            if folio_notas is None:
-                st.error("Ingresa el folio inicial para Notas.")
-                ok = False
-            else:
-                _run(
+            if ok and desde_emision <= 5:
+                _run_script(
                     [_sys.executable, SCRIPT_NOTAS, "--folio", str(int(folio_notas))],
                     "Paso 5 — Notas"
                 )
