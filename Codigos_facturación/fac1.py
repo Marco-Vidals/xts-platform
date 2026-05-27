@@ -7,7 +7,7 @@ import json
 import sys
 import os
 
-def factura(rango,f,folio):
+def factura(rango,f,folio,auto_confirm=False):
     for i in range(rango):#len(f)):
         #print(folio)
         folio=int(folio)+1
@@ -157,7 +157,7 @@ def factura(rango,f,folio):
             }
         print(body)
         print('¿Es correcta la factura?')
-        val = input('y/n:') if sys.stdin.isatty() else 'y'
+        val = 'y' if auto_confirm else input('y/n:')
         if val=='y':
             response=requests.post(url, data=body.encode('utf-8'), headers=heads)
             print(f'[DEBUG] Status: {response.status_code}')
@@ -209,7 +209,7 @@ def factura(rango,f,folio):
             print("Continuar con la siguiente: 1")
             print("Detener el proceso: 2")
             print("")
-            ok = input("Continuar/Detener:") if sys.stdin.isatty() else '1'
+            ok = '1' if auto_confirm else input("Continuar/Detener:")
             if ok=='1':
                 print('=======================================')
                 print("     Continuamos")

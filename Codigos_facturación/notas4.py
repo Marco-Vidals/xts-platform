@@ -9,7 +9,7 @@ import os
 
 
 
-def notas(rango,f,folio):
+def notas(rango,f,folio,auto_confirm=False):
     for i in range(rango,rango+1):
         #print(folio)
         if f['Tipo'][i]=='NC':
@@ -274,7 +274,7 @@ def notas(rango,f,folio):
             }
         print(body)
         print('¿Es correcta la nota?')
-        val = input('y/n:') if sys.stdin.isatty() else 'y'
+        val = 'y' if auto_confirm else input('y/n:')
         if val=='y':
             response=requests.post(url, data=body.encode('utf-8'), headers=heads)
             print(f'[DEBUG] Status: {response.status_code}')
@@ -322,7 +322,7 @@ def notas(rango,f,folio):
             print("Continuar con la siguiente: 1")
             print("Detener el proceso: 2")
             print("")
-            ok = input("Continuar/Detener:") if sys.stdin.isatty() else '1'
+            ok = '1' if auto_confirm else input("Continuar/Detener:")
             if ok=='1':
                 print('=======================================')
                 print("     Continuamos")

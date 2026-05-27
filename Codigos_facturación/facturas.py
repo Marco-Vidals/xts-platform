@@ -12,6 +12,8 @@ _parser = argparse.ArgumentParser()
 _parser.add_argument("--folio", type=int, default=None)
 _parser.add_argument("--include-fufs", type=str, default=None,
                      help="Comma-separated FUFs to process (default: all)")
+_parser.add_argument("--auto-confirm", action="store_true",
+                     help="Skip y/n confirmation for each document")
 _args, _ = _parser.parse_known_args()
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -45,36 +47,32 @@ a = folio + 1  # valor por defecto si no hay únicos
 if len(id_unicos)>0:
     import fac1
     f=pd.read_excel('id_unicos.xlsx')
-    a=fac1.factura(len(id_unicos), f, folio)
+    a=fac1.factura(len(id_unicos), f, folio, auto_confirm=_args.auto_confirm)
 
 folio=a - 1
 
 def encontrar_renglon(archivo, cadena):
     df = pd.read_excel(archivo)
-    # Iterar sobre cada fila del DataFrame
     for indice, fila in df.iterrows():
-        # Buscar la cadena en cada celda de la fila
         if cadena in fila.values:
-            # Se encontró la cadena en la fila
             print(f"La cadena '{cadena}' se encuentra en la fila {indice}.")
-            return indice  # Sumamos 2 porque los índices de las filas en pandas comienzan desde 0
+            return indice
 
-#folio=1297
 if len(grupo)>0:
     for i in grupo:
         f=pd.read_excel('id_duplicados.xlsx')
         folio=folio + 1
         cadena=i[0]
         renglon=encontrar_renglon('id_duplicados.xlsx', i[0])
-        
+
         if len(i[1])==2:
             import fac2
             f1=i[1]
-            fac2.factura(renglon, f, folio)
+            fac2.factura(renglon, f, folio, auto_confirm=_args.auto_confirm)
         if len(i[1])==3:
             import fac3
-            fac3.factura(renglon, f, folio)
+            fac3.factura(renglon, f, folio, auto_confirm=_args.auto_confirm)
         if len(i[1])==4:
             import fac4
-            fac4.factura(renglon, f, folio)
+            fac4.factura(renglon, f, folio, auto_confirm=_args.auto_confirm)
 

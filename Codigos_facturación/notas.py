@@ -12,6 +12,8 @@ _parser = argparse.ArgumentParser()
 _parser.add_argument("--folio", type=int, default=None)
 _parser.add_argument("--include-fufs", type=str, default=None,
                      help="Comma-separated FUFs to process (default: all)")
+_parser.add_argument("--auto-confirm", action="store_true",
+                     help="Skip y/n confirmation for each document")
 _args, _ = _parser.parse_known_args()
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,22 +61,16 @@ a = folio + 1  # valor por defecto si no hay únicos
 if len(id_unicos)>0:
     import notas1
     f=pd.read_excel('id_unicos.xlsx')
-    a=notas1.notas(len(id_unicos), f, folio)
+    a=notas1.notas(len(id_unicos), f, folio, auto_confirm=_args.auto_confirm)
 
 folio=a - 1
 
 def encontrar_renglon(archivo, cadena):
     df = pd.read_excel(archivo)
-    # Iterar sobre cada fila del DataFrame
     for indice, fila in df.iterrows():
-        # Buscar la cadena en cada celda de la fila
         if cadena in fila.values:
-            # Se encontró la cadena en la fila
             print(f"La cadena '{cadena}' se encuentra en la fila {indice}.")
-            return indice  # Sumamos 2 porque los índices de las filas en pandas comienzan desde 0
-
-
-
+            return indice
 
 if len(grupo)>0:
     for i in grupo:
@@ -82,17 +78,17 @@ if len(grupo)>0:
         folio=folio + 1
         cadena=i[0]
         renglon=encontrar_renglon('id_duplicados.xlsx', i[0])
-        
+
         if len(i[1])==2:
             import notas2
             f1=i[1]
-            notas2.notas(renglon, f, folio)
+            notas2.notas(renglon, f, folio, auto_confirm=_args.auto_confirm)
         if len(i[1])==3:
             f1=i[1]
             import notas3
-            notas3.notas(renglon, f, folio)
+            notas3.notas(renglon, f, folio, auto_confirm=_args.auto_confirm)
         if len(i[1])==4:
             f1=i[1]
             import notas4
-            notas4.notas(renglon, f, folio)
+            notas4.notas(renglon, f, folio, auto_confirm=_args.auto_confirm)
 

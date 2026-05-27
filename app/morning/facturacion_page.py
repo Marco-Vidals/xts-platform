@@ -455,7 +455,8 @@ with tab_flujo:
         if ok_fufs and st.button("▶  Subir facturas confirmadas", key="btn_subir_fac"):
             ok = _exec([_sys.executable, SCRIPT_FAC,
                         "--folio", str(int(folio_fac)),
-                        "--include-fufs", ",".join(ok_fufs)],
+                        "--include-fufs", ",".join(ok_fufs),
+                        "--auto-confirm"],
                        "Paso 4 — Facturas")
             try:
                 df = pd.read_excel(PATH_NOTAS)
@@ -524,7 +525,8 @@ with tab_flujo:
         if ok_fufs and st.button("▶  Subir notas confirmadas", key="btn_subir_notas"):
             _exec([_sys.executable, SCRIPT_NOTAS,
                    "--folio", str(int(folio_notas)),
-                   "--include-fufs", ",".join(ok_fufs)],
+                   "--include-fufs", ",".join(ok_fufs),
+                   "--auto-confirm"],
                   "Paso 5 — Notas")
             w["step"] = "done"
             st.rerun()
