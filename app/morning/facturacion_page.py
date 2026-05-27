@@ -110,9 +110,8 @@ tab_resumen, tab_flujo, tab_fuf = st.tabs(["Resumen", "Flujo Semanal", "Lista FU
 # TAB 0 — Resumen Facturación
 # ═══════════════════════════════════════════════════════════════════════════════
 _PAGE_DIR = os.path.dirname(os.path.abspath(__file__))
-FACTURACION_BASE = os.environ.get(
-    "FACTURACION_BASE",
-    os.path.normpath(os.path.join(_PAGE_DIR, "..", "..", "Facturacion"))
+FACTURACION_BASE = os.environ.get("FACTURACION_BASE") or os.path.normpath(
+    os.path.join(_PAGE_DIR, "..", "..", "..", "Facturacion")
 )
 PATH_FACTURAS = os.path.join(FACTURACION_BASE, "XiiXFacturas.csv")
 PATH_NOTAS    = os.path.join(FACTURACION_BASE, "XiiXNotas.xlsx")

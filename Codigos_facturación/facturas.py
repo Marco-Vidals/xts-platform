@@ -16,9 +16,8 @@ _args, _ = _parser.parse_known_args()
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_SCRIPT_DIR, "..", "Extractors", ".env"))
-BASE_FAC = os.environ.get(
-    "FACTURACION_BASE",
-    os.path.normpath(os.path.join(_SCRIPT_DIR, "..", "Facturacion"))
+BASE_FAC = os.environ.get("FACTURACION_BASE") or os.path.normpath(
+    os.path.join(_SCRIPT_DIR, "..", "..", "Facturacion")
 )
 
 f = pd.read_csv(os.path.join(BASE_FAC, 'XiiXFacturas.csv'))
