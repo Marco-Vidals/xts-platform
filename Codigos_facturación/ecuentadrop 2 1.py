@@ -162,3 +162,9 @@ else:
     for f in missing_all:
         print(f"  - {f}")
 print("="*60)
+
+import json as _json
+_missing_path = os.path.join(BASE_FAC, "missing_edcs.json")
+with open(_missing_path, "w", encoding="utf-8") as _mf:
+    _json.dump(missing_all, _mf)
+print(f"\nLista de faltantes guardada en: {_missing_path}")

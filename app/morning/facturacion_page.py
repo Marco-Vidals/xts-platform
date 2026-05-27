@@ -212,10 +212,13 @@ with tab_flujo:
         "5 · Generar notas de crédito/débito",
     ]
 
+    ECUENTA_DROP = os.path.join(FACTURACION_BASE, "Ecuenta Drop")
+
     # ── Session state init ────────────────────────────────────────────────────
     _W0 = {"step": "inicio", "log": [],
            "fac_rows": [], "fac_idx": 0, "fac_ok": [],
-           "notas_rows": [], "notas_idx": 0, "notas_ok": []}
+           "notas_rows": [], "notas_idx": 0, "notas_ok": [],
+           "desde": 1}
     if "fac_w" not in st.session_state:
         st.session_state.fac_w = dict(_W0)
     w = st.session_state.fac_w
@@ -289,30 +292,117 @@ with tab_flujo:
                              format_func=lambda x: _PASOS[x-1], key="w_desde")
         if st.button(f"▶  Iniciar desde paso {desde}", key="btn_iniciar"):
             w["desde"] = desde
-            if desde <= 3:
-                ok = _exec([_sys.executable, RUN_WEEKLY,
-                            "--desde", str(desde), "--hasta", "3"], f"Pasos {desde}–3")
-                if not ok:
-                    st.rerun()
-            if desde <= 4:
+            if desde == 1:
+                # Paso 1 solo (descarga) → luego revisar faltantes
+                ok = _exec([_sys.executable, RUN_WEEKLY, "--desde", "1", "--hasta", "1"],
+                           "Paso 1 — Descarga de EDCs")
+                w["step"] = "check_missing"
+            elif desde == 2:
+                w["step"] = "check_missing"   # permite subir EDCs manuales antes de continuar
+            elif desde == 3:
+                ok = _exec([_sys.executable, RUN_WEEKLY, "--desde", "3", "--hasta", "3"],
+                           "Paso 3 — Extraer datos de EDCs")
+                w["step"] = "rev_fac" if ok else "inicio"
+                if ok:
+                    try:
+                        df = pd.read_csv(PATH_FACTURAS); df.fillna(0, inplace=True)
+                        w["fac_rows"] = df.to_dict("records"); w["fac_idx"] = 0; w["fac_ok"] = []
+                    except Exception as e:
+                        _append_log("err", f"No se pudo leer XiiXFacturas.csv: {e}")
+            elif desde == 4:
                 try:
-                    df = pd.read_csv(PATH_FACTURAS)
-                    df.fillna(0, inplace=True)
-                    w["fac_rows"] = df.to_dict("records")
-                    w["fac_idx"] = 0; w["fac_ok"] = []
+                    df = pd.read_csv(PATH_FACTURAS); df.fillna(0, inplace=True)
+                    w["fac_rows"] = df.to_dict("records"); w["fac_idx"] = 0; w["fac_ok"] = []
                     w["step"] = "rev_fac"
                 except Exception as e:
                     _append_log("err", f"No se pudo leer XiiXFacturas.csv: {e}")
             else:
                 try:
-                    df = pd.read_excel(PATH_NOTAS)
-                    df.fillna(0, inplace=True)
-                    w["notas_rows"] = df.to_dict("records")
-                    w["notas_idx"] = 0; w["notas_ok"] = []
+                    df = pd.read_excel(PATH_NOTAS); df.fillna(0, inplace=True)
+                    w["notas_rows"] = df.to_dict("records"); w["notas_idx"] = 0; w["notas_ok"] = []
                     w["step"] = "rev_notas"
                 except Exception as e:
                     _append_log("err", f"No se pudo leer XiiXNotas.xlsx: {e}")
             st.rerun()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # check_missing — Verificar EDCs faltantes y permitir subida manual
+    # ══════════════════════════════════════════════════════════════════════════
+    elif w["step"] == "check_missing":
+        _show_log()
+        st.divider()
+        st.markdown("### Paso 1 · Verificación de EDCs")
+
+        import json as _json
+        _missing_path = os.path.join(FACTURACION_BASE, "missing_edcs.json")
+        try:
+            with open(_missing_path, encoding="utf-8") as _mf:
+                missing = _json.load(_mf)
+        except FileNotFoundError:
+            missing = []
+        except Exception as e:
+            st.error(f"No se pudo leer missing_edcs.json: {e}")
+            missing = []
+
+        os.makedirs(ECUENTA_DROP, exist_ok=True)
+
+        if not missing:
+            st.success("✓ Todos los EDCs se descargaron correctamente.")
+        else:
+            st.warning(f"**{len(missing)} EDC(s) no se descargaron.** Súbelos manualmente para continuar.")
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            uploaded_count = 0
+            for edc_name in missing:
+                dest_path = os.path.join(ECUENTA_DROP, f"{edc_name}.csv")
+                already = os.path.exists(dest_path)
+                col_lbl, col_up = st.columns([2, 3])
+                with col_lbl:
+                    if already:
+                        st.markdown(f"<div style='color:#34d399;font-size:0.85rem;'>✓ {edc_name}</div>",
+                                    unsafe_allow_html=True)
+                        uploaded_count += 1
+                    else:
+                        st.markdown(f"<div style='color:#FF6B35;font-size:0.85rem;'>✗ {edc_name}</div>",
+                                    unsafe_allow_html=True)
+                with col_up:
+                    if not already:
+                        f_up = st.file_uploader(f"Subir {edc_name}",
+                                                type=["csv", "xlsx", "xls"],
+                                                key=f"edc_up_{edc_name}",
+                                                label_visibility="collapsed")
+                        if f_up is not None:
+                            try:
+                                if f_up.name.endswith((".xlsx", ".xls")):
+                                    df_up = pd.read_excel(f_up, header=None)
+                                else:
+                                    df_up = pd.read_csv(f_up, header=None)
+                                df_up.to_csv(dest_path, index=False, header=False)
+                                st.success(f"Guardado como {edc_name}.csv")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error al guardar: {e}")
+                    else:
+                        uploaded_count += 1
+
+            remaining = len(missing) - uploaded_count
+            if remaining > 0:
+                st.info(f"Faltan {remaining} EDC(s) por subir. Puedes continuar sin ellos pero las facturas de esas cuentas no se generarán.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_cont, col_sort = st.columns(2)
+        with col_cont:
+            if st.button("▶  Continuar — Organizar y Extraer (Pasos 2-3)", key="btn_continue_23"):
+                ok = _exec([_sys.executable, RUN_WEEKLY, "--desde", "2", "--hasta", "3"],
+                           "Pasos 2-3 — Organizar y Extraer")
+                if ok:
+                    try:
+                        df = pd.read_csv(PATH_FACTURAS); df.fillna(0, inplace=True)
+                        w["fac_rows"] = df.to_dict("records"); w["fac_idx"] = 0; w["fac_ok"] = []
+                        w["step"] = "rev_fac"
+                    except Exception as e:
+                        _append_log("err", f"No se pudo leer XiiXFacturas.csv: {e}")
+                st.rerun()
 
     # ══════════════════════════════════════════════════════════════════════════
     # rev_fac — Revisión factura por factura
