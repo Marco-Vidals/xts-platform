@@ -4,6 +4,8 @@ import datetime
 from datetime import timedelta
 import numpy as np
 import json
+import sys
+import os
 
 
 def notas(rango,f,folio):
@@ -161,44 +163,59 @@ def notas(rango,f,folio):
             }
         print(body)
         print('¿Es correcta la nota?')
-        val=input('y/n:')
+        val = input('y/n:') if sys.stdin.isatty() else 'y'
         if val=='y':
-            response=requests.post(url,data=body, headers=heads)
-            print(f"HTTP: {response.status_code}")
+            response=requests.post(url, data=body.encode('utf-8'), headers=heads)
+            print(f'[DEBUG] Status: {response.status_code}')
+            print(f'[DEBUG] Response: {response.text[:1000]}')
             try:
-                import base64 as _b64
+                import base64 as _b64, xml.etree.ElementTree as _ET, os as _os, csv as _csv
                 rj = response.json()
-                print(f"status   : {rj.get('status')}")
-                print(f"resp_code: {rj.get('resp_code')}")
-                msg = rj.get('message', {})
-                print(f"codigo   : {msg.get('codigo')}")
-                print(f"resultado: {msg.get('resultado')}")
-                xml_b64 = msg.get('xmlData', '')
+                codigo = rj.get('message', {}).get('codigo', '')
+                resultado = rj.get('message', {}).get('resultado', '')
+                xml_b64 = rj.get('message', {}).get('xmlData', '')
+                uuid = ''
                 if xml_b64:
-                    xml = _b64.b64decode(xml_b64).decode('utf-8')
-                    print("=== XML SAT (error detalle) ===")
-                    print(xml[:4000])
-                    print("==============================")
+                    xml_str = _b64.b64decode(xml_b64).decode('utf-8')
+                    print(f'[XML Click Factura]\n{xml_str[:2000]}')
+                    root = _ET.fromstring(xml_str)
+                    tfd = root.find('.//{http://www.sat.gob.mx/TimbreFiscalDigital}TimbreFiscalDigital')
+                    if tfd is not None:
+                        uuid = tfd.get('UUID', '')
+                    else:
+                        for tag in root.iter():
+                            if tag.text and tag.text.strip():
+                                print(f'  <{tag.tag}>: {tag.text.strip()}')
+                if codigo and codigo != '200' and codigo != '201':
+                    print(f'✗ Click Factura error: codigo={codigo}, resultado={resultado}')
+                elif uuid:
+                    print(f'✓ UUID: {uuid}')
+                fuf = str(f['FUF'][i])
+                _base_fac = os.environ.get('FACTURACION_BASE', os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Facturacion')))
+                _csv_path = os.path.join(_base_fac, 'folios_timbrados.csv')
+                _exists = _os.path.exists(_csv_path)
+                with open(_csv_path, 'a', newline='', encoding='utf-8') as _cf:
+                    _w = _csv.writer(_cf)
+                    if not _exists:
+                        _w.writerow(['FUF', 'UUID'])
+                    _w.writerow([fuf, uuid])
+                print(f'✓ UUID guardado: {uuid}')
             except Exception as _ex:
-                print(f"Error parseando respuesta: {_ex}")
-                print(response.content)
+                print(f'Advertencia: no se pudo procesar respuesta ({_ex})')
+            print('OK')
         if val=='n':
             print('=================================================')
-            
             print("        Esta nota no se subió")
-            
             print('=================================================')
-            
             print("")
             print("Continuar con la siguiente: 1")
             print("Detener el proceso: 2")
             print("")
-            ok=input("Continuar/Detener:")
+            ok = input("Continuar/Detener:") if sys.stdin.isatty() else '1'
             if ok=='1':
                 print('=======================================')
                 print("     Continuamos")
                 print('=======================================')
-                
             if ok=='2':
                 print('=======================================')
                 print("     Se detuvo el envío")

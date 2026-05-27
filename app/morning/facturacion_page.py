@@ -375,9 +375,11 @@ with tab_flujo:
                             try:
                                 if f_up.name.endswith((".xlsx", ".xls")):
                                     df_up = pd.read_excel(f_up, header=None)
+                                    df_up.to_csv(dest_path, index=False, header=False)
                                 else:
-                                    df_up = pd.read_csv(f_up, header=None)
-                                df_up.to_csv(dest_path, index=False, header=False)
+                                    raw = f_up.read()
+                                    with open(dest_path, "wb") as _df:
+                                        _df.write(raw)
                                 st.success(f"Guardado como {edc_name}.csv")
                                 st.rerun()
                             except Exception as e:
