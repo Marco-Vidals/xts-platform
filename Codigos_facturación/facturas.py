@@ -5,7 +5,12 @@ from datetime import timedelta
 import numpy as np
 import json
 import os
+import argparse
 from dotenv import load_dotenv
+
+_parser = argparse.ArgumentParser()
+_parser.add_argument("--folio", type=int, default=None)
+_args, _ = _parser.parse_known_args()
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_SCRIPT_DIR, "..", "Extractors", ".env"))
@@ -26,7 +31,10 @@ grupo=id_duplicados.groupby('FUF')
 id_duplicados.to_excel('id_duplicados.xlsx', index=False)
 id_unicos.to_excel('id_unicos.xlsx', index=False)
 
-folio = int(input("Ingresa el número de folio:")) - 1
+if _args.folio is not None:
+    folio = _args.folio - 1
+else:
+    folio = int(input("Ingresa el número de folio:")) - 1
 a = folio + 1  # valor por defecto si no hay únicos
 
 if len(id_unicos)>0:

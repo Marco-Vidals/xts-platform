@@ -197,58 +197,103 @@ with tab_resumen:
 with tab_flujo:
     import subprocess, sys as _sys
 
-    RUN_WEEKLY = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..", "..", "Codigos_facturación", "run_weekly.py"
-    )
+    _FAC_DIR = os.path.normpath(os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "..", "Codigos_facturación"
+    ))
+    RUN_WEEKLY   = os.path.join(_FAC_DIR, "run_weekly.py")
+    SCRIPT_FAC   = os.path.join(_FAC_DIR, "facturas.py")
+    SCRIPT_NOTAS = os.path.join(_FAC_DIR, "notas.py")
 
-    st.markdown(
-        "<div style='color:#5a6280;font-size:0.8rem;margin-bottom:16px;'>"
-        "Abre una terminal y corre el flujo completo de facturación semanal.</div>",
-        unsafe_allow_html=True,
-    )
-
-    PASOS = [
-        "1. Descarga de EDCs",
-        "2. Organizar archivos por fecha",
-        "3. Extraer datos de EDCs",
-        "4. Generar facturas",
-        "5. Generar notas de crédito/débito",
+    _PASOS_LABELS = [
+        "1 · Descarga de EDCs",
+        "2 · Organizar archivos por fecha",
+        "3 · Extraer datos de EDCs",
+        "4 · Generar facturas",
+        "5 · Generar notas de crédito/débito",
     ]
-    for p in PASOS:
+
+    st.markdown("##### Pasos disponibles")
+    for p in _PASOS_LABELS:
         st.markdown(f"<div style='color:#c0c4cc;font-size:0.82rem;margin:2px 0;'>• {p}</div>",
                     unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    st.info("Corre los pasos 1-3 (Descarga, Organización y Extracción de EDCs). "
-            "Los pasos 4-5 (Facturas y Notas) requieren número de folio — córrelos localmente.")
+    col_d, col_h = st.columns(2)
+    with col_d:
+        desde_paso = st.selectbox("¿Desde qué paso?", [1, 2, 3, 4, 5],
+                                  format_func=lambda x: _PASOS_LABELS[x-1], key="desde_paso")
+    with col_h:
+        hasta_paso = st.selectbox("¿Hasta qué paso?", [1, 2, 3, 4, 5],
+                                  index=4,
+                                  format_func=lambda x: _PASOS_LABELS[x-1], key="hasta_paso")
 
-    if st.button("▶  Correr Pasos 1-3 (Descarga y Extracción)", key="btn_run_weekly"):
-        script = os.path.normpath(RUN_WEEKLY)
-        if not os.path.exists(script):
-            st.error(f"No se encontró run_weekly.py en: {script}")
-        else:
-            with st.spinner("Corriendo pasos 1-3... puede tardar varios minutos."):
+    # Folio inputs solo si aplican
+    folio_fac = folio_notas = None
+    if desde_paso <= 4 <= hasta_paso:
+        st.markdown("<br>", unsafe_allow_html=True)
+        folio_fac = st.number_input("Folio inicial — Facturas", min_value=1, step=1,
+                                    value=1, key="folio_fac")
+    if desde_paso <= 5 <= hasta_paso:
+        folio_notas = st.number_input("Folio inicial — Notas de Crédito/Débito",
+                                      min_value=1, step=1, value=1, key="folio_notas")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if st.button(f"▶  Correr desde paso {desde_paso} hasta paso {hasta_paso}", key="btn_run_flujo"):
+
+        def _run(cmd, label, timeout=600):
+            with st.spinner(f"{label}..."):
                 try:
-                    result = subprocess.run(
-                        [_sys.executable, script, "--desde", "1", "--hasta", "3"],
-                        capture_output=True, text=True,
-                        cwd=os.path.dirname(script),
-                        timeout=600,
-                    )
-                    if result.returncode == 0:
-                        st.success("Pasos 1-3 completados.")
+                    r = subprocess.run(cmd, capture_output=True, text=True,
+                                       cwd=_FAC_DIR, timeout=timeout)
+                    if r.returncode == 0:
+                        st.success(f"✓ {label} completado.")
                     else:
-                        st.error("El flujo terminó con errores.")
-                    if result.stdout:
-                        st.code(result.stdout[-4000:], language=None)
-                    if result.stderr:
-                        st.code(result.stderr[-2000:], language=None)
+                        st.error(f"✗ {label} terminó con errores.")
+                    if r.stdout:
+                        st.code(r.stdout[-4000:], language=None)
+                    if r.stderr:
+                        st.code(r.stderr[-2000:], language=None)
+                    return r.returncode == 0
                 except subprocess.TimeoutExpired:
-                    st.error("Tiempo límite excedido (10 min). Revisa los logs.")
+                    st.error(f"Tiempo límite excedido en {label}.")
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error en {label}: {e}")
+            return False
+
+        ok = True
+
+        # Pasos 1-3 via run_weekly
+        if ok and desde_paso <= 3 and hasta_paso >= 1:
+            ok = _run(
+                [_sys.executable, RUN_WEEKLY,
+                 "--desde", str(desde_paso),
+                 "--hasta", str(min(3, hasta_paso))],
+                f"Pasos {desde_paso}–{min(3, hasta_paso)}"
+            )
+
+        # Paso 4 — Facturas
+        if ok and desde_paso <= 4 <= hasta_paso:
+            if folio_fac is None:
+                st.error("Ingresa el folio inicial para Facturas.")
+                ok = False
+            else:
+                ok = _run(
+                    [_sys.executable, SCRIPT_FAC, "--folio", str(int(folio_fac))],
+                    "Paso 4 — Facturas"
+                )
+
+        # Paso 5 — Notas
+        if ok and desde_paso <= 5 <= hasta_paso:
+            if folio_notas is None:
+                st.error("Ingresa el folio inicial para Notas.")
+                ok = False
+            else:
+                _run(
+                    [_sys.executable, SCRIPT_NOTAS, "--folio", str(int(folio_notas))],
+                    "Paso 5 — Notas"
+                )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB — Lista FUF
