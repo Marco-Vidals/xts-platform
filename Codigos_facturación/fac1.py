@@ -158,9 +158,12 @@ def factura(rango,f,folio):
         print(body)
         print('¿Es correcta la factura?')
         val = input('y/n:') if sys.stdin.isatty() else 'y'
+        print(f'[DEBUG] val={repr(val)} isatty={sys.stdin.isatty()}')
         if val=='y':
+            print(f'[DEBUG] Enviando POST a {url}...')
             response=requests.post(url,data=body, headers=heads)
-            print(response)
+            print(f'[DEBUG] Status: {response.status_code}')
+            print(f'[DEBUG] Response: {response.text[:500]}')
             try:
                 import base64 as _b64, xml.etree.ElementTree as _ET, os as _os, csv as _csv
                 rj = response.json()
