@@ -4,6 +4,8 @@ import datetime
 from datetime import timedelta
 import numpy as np
 import json
+import sys
+import os
 
 
 def factura(rango,f,folio):
@@ -235,7 +237,8 @@ def factura(rango,f,folio):
                     tfd = root.find('.//{http://www.sat.gob.mx/TimbreFiscalDigital}TimbreFiscalDigital')
                     uuid = tfd.get('UUID') if tfd is not None else ''
                 fuf = str(f['FUF'][i])
-                _csv_path = 'C:\\Users\\xiixt\\OneDrive - XIIX TRADING SOLUTIONS SAPI DE CV\\XTS R&D\\Facturacion\\folios_timbrados.csv'
+                _base_fac = os.environ.get('FACTURACION_BASE', os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Facturacion')))
+                _csv_path = os.path.join(_base_fac, 'folios_timbrados.csv')
                 _exists = _os.path.exists(_csv_path)
                 with open(_csv_path, 'a', newline='', encoding='utf-8') as _cf:
                     _w = _csv.writer(_cf)
