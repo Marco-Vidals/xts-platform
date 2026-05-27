@@ -213,23 +213,21 @@ with tab_flujo:
     ]
 
     # ── Session state init ────────────────────────────────────────────────────
+    _W0 = {"step": "inicio", "log": [],
+           "fac_rows": [], "fac_idx": 0, "fac_ok": [],
+           "notas_rows": [], "notas_idx": 0, "notas_ok": []}
     if "fac_w" not in st.session_state:
-        st.session_state.fac_w = {"step": "inicio", "log": []}
-
-    w   = st.session_state.fac_w
-    log = w["log"]
+        st.session_state.fac_w = dict(_W0)
+    w = st.session_state.fac_w
 
     def _append_log(kind, text):
-        log.append((kind, text))
+        w["log"].append((kind, text))
 
     def _show_log():
-        for kind, text in log:
-            if kind == "ok":
-                st.success(text)
-            elif kind == "err":
-                st.error(text)
-            else:
-                st.code(text, language=None)
+        for kind, text in w["log"]:
+            if kind == "ok":    st.success(text)
+            elif kind == "err": st.error(text)
+            else:               st.code(text, language=None)
 
     def _exec(cmd, label):
         with st.spinner(f"{label}..."):
@@ -241,24 +239,44 @@ with tab_flujo:
                 if r.returncode == 0:
                     _append_log("ok", f"✓ {label} completado.")
                     return True
-                else:
-                    _append_log("err", f"✗ {label} terminó con errores.")
-                    return False
+                _append_log("err", f"✗ {label} terminó con errores.")
             except subprocess.TimeoutExpired:
                 _append_log("err", f"Tiempo límite excedido en {label}.")
             except Exception as e:
                 _append_log("err", f"Error: {e}")
         return False
 
-    # ── Botón reiniciar (siempre visible si no es inicio) ─────────────────────
+    def _card(row, label="Factura"):
+        campos = ["FUF","Participante","Periodo ECD","Fecha Limite de Pago",
+                  "Subtotal","Descuento","IVA","TOTAL",
+                  "Importe Original","Monto Ajuste","Tipo"]
+        lines = "".join(
+            f"<tr><td style='color:#5a6280;padding:4px 12px 4px 0;font-size:0.8rem;"
+            f"text-transform:uppercase;letter-spacing:.8px;white-space:nowrap'>{k}</td>"
+            f"<td style='color:#c0c4cc;padding:4px 0;font-size:0.88rem;'>{row.get(k,'')}</td></tr>"
+            for k in campos if k in row and row[k] not in (0, "", None, "0")
+        )
+        total = row.get("TOTAL", "")
+        st.markdown(
+            f"<div style='background:#1e2130;border:1px solid #2d3350;border-left:4px solid #00d4e8;"
+            f"border-radius:6px;padding:16px 20px;margin-bottom:8px;'>"
+            f"<div style='color:#00d4e8;font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;"
+            f"margin-bottom:10px;'>{label}</div>"
+            f"<table>{lines}</table>"
+            f"<div style='text-align:right;color:#34d399;font-size:1.2rem;font-weight:700;"
+            f"margin-top:10px;'>TOTAL: {total}</div></div>",
+            unsafe_allow_html=True,
+        )
+
+    # ── Reiniciar ─────────────────────────────────────────────────────────────
     if w["step"] != "inicio":
         if st.button("🔄 Reiniciar flujo", key="btn_reset"):
-            st.session_state.fac_w = {"step": "inicio", "log": []}
+            st.session_state.fac_w = dict(_W0)
             st.rerun()
         st.markdown("<br>", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PASO 0 — ¿Desde dónde empezar?
+    # inicio — ¿Desde qué paso?
     # ══════════════════════════════════════════════════════════════════════════
     if w["step"] == "inicio":
         st.markdown("##### Pasos disponibles")
@@ -269,104 +287,169 @@ with tab_flujo:
 
         desde = st.selectbox("¿Desde qué paso quieres empezar?", [1, 2, 3, 4, 5],
                              format_func=lambda x: _PASOS[x-1], key="w_desde")
-
         if st.button(f"▶  Iniciar desde paso {desde}", key="btn_iniciar"):
             w["desde"] = desde
             if desde <= 3:
-                ok = _exec(
-                    [_sys.executable, RUN_WEEKLY, "--desde", str(desde), "--hasta", "3"],
-                    f"Pasos {desde}–3"
-                )
-                w["step"] = "review_fac" if ok else "inicio"
-            elif desde == 4:
-                w["step"] = "review_fac"
+                ok = _exec([_sys.executable, RUN_WEEKLY,
+                            "--desde", str(desde), "--hasta", "3"], f"Pasos {desde}–3")
+                if not ok:
+                    st.rerun()
+            if desde <= 4:
+                try:
+                    df = pd.read_csv(PATH_FACTURAS)
+                    df.fillna(0, inplace=True)
+                    w["fac_rows"] = df.to_dict("records")
+                    w["fac_idx"] = 0; w["fac_ok"] = []
+                    w["step"] = "rev_fac"
+                except Exception as e:
+                    _append_log("err", f"No se pudo leer XiiXFacturas.csv: {e}")
             else:
-                w["step"] = "review_notas"
+                try:
+                    df = pd.read_excel(PATH_NOTAS)
+                    df.fillna(0, inplace=True)
+                    w["notas_rows"] = df.to_dict("records")
+                    w["notas_idx"] = 0; w["notas_ok"] = []
+                    w["step"] = "rev_notas"
+                except Exception as e:
+                    _append_log("err", f"No se pudo leer XiiXNotas.xlsx: {e}")
             st.rerun()
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PASO 1 — Revisión de Facturas + Folio
+    # rev_fac — Revisión factura por factura
     # ══════════════════════════════════════════════════════════════════════════
-    elif w["step"] == "review_fac":
+    elif w["step"] == "rev_fac":
         _show_log()
-        st.divider()
-        st.markdown("### Paso 4 · Facturas")
-        st.caption("Revisa las facturas generadas y confirma antes de subir a Click Factura.")
+        rows = w["fac_rows"]
+        idx  = w["fac_idx"]
+        total_rows = len(rows)
 
-        try:
-            df_fac = pd.read_csv(PATH_FACTURAS)
-            df_fac.fillna(0, inplace=True)
-            cols_show = [c for c in ["FUF","Participante","Periodo ECD","Subtotal","IVA","TOTAL"]
-                         if c in df_fac.columns]
-            st.dataframe(df_fac[cols_show], use_container_width=True, hide_index=True)
-            total = df_fac["TOTAL"].sum() if "TOTAL" in df_fac.columns else 0
-            st.markdown(f"<div style='text-align:right;color:#00d4e8;font-weight:700;"
-                        f"margin-top:4px;'>Total: ${total:,.2f} · {len(df_fac)} facturas</div>",
-                        unsafe_allow_html=True)
-        except FileNotFoundError:
-            st.warning("XiiXFacturas.csv no encontrado. ¿Corriste el paso 3?")
-        except Exception as e:
-            st.warning(f"No se pudo cargar: {e}")
+        if idx >= total_rows:
+            # Terminó revisión — pedir folio
+            w["step"] = "folio_fac"
+            st.rerun()
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        folio_fac = st.number_input("Ingresa el número de folio inicial para Facturas:",
-                                    min_value=1, step=1, value=1, key="w_folio_fac")
-        ok_fac = st.checkbox("✅  Las facturas son correctas, subir a Click Factura",
-                             key="w_confirm_fac")
+        st.markdown(f"### Factura {idx+1} de {total_rows}")
+        _card(rows[idx], f"Factura {idx+1} / {total_rows}")
 
-        if st.button("▶  Subir Facturas", key="btn_subir_fac", disabled=not ok_fac):
-            w["folio_fac"] = int(folio_fac)
-            ok = _exec([_sys.executable, SCRIPT_FAC, "--folio", str(int(folio_fac))],
+        omitidas = total_rows - idx - len(w["fac_ok"])
+        st.caption(f"Confirmadas: {len(w['fac_ok'])}  ·  Pendientes: {total_rows - idx}")
+
+        col_si, col_no = st.columns(2)
+        with col_si:
+            if st.button("✅  Correcta", key=f"fac_ok_{idx}", use_container_width=True):
+                w["fac_ok"].append(str(rows[idx].get("FUF","")))
+                w["fac_idx"] += 1
+                st.rerun()
+        with col_no:
+            if st.button("⏭  Omitir", key=f"fac_skip_{idx}", use_container_width=True):
+                w["fac_idx"] += 1
+                st.rerun()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # folio_fac — Folio + subir facturas confirmadas
+    # ══════════════════════════════════════════════════════════════════════════
+    elif w["step"] == "folio_fac":
+        _show_log()
+        ok_fufs = w["fac_ok"]
+        total_rows = len(w["fac_rows"])
+        st.markdown("### Paso 4 · Subir Facturas")
+        st.markdown(f"**{len(ok_fufs)} de {total_rows} facturas confirmadas** para subir a Click Factura.")
+        if ok_fufs:
+            st.code(", ".join(ok_fufs), language=None)
+        else:
+            st.warning("No confirmaste ninguna factura. Reinicia el flujo si fue un error.")
+
+        folio_fac = st.number_input("Ingresa el número de folio inicial:", min_value=1,
+                                    step=1, value=1, key="w_folio_fac")
+        if ok_fufs and st.button("▶  Subir facturas confirmadas", key="btn_subir_fac"):
+            ok = _exec([_sys.executable, SCRIPT_FAC,
+                        "--folio", str(int(folio_fac)),
+                        "--include-fufs", ",".join(ok_fufs)],
                        "Paso 4 — Facturas")
-            w["step"] = "review_notas" if ok else "review_fac"
+            try:
+                df = pd.read_excel(PATH_NOTAS)
+                df.fillna(0, inplace=True)
+                w["notas_rows"] = df.to_dict("records")
+                w["notas_idx"] = 0; w["notas_ok"] = []
+            except Exception as e:
+                _append_log("err", f"No se pudo leer XiiXNotas.xlsx: {e}")
+            w["step"] = "rev_notas"
+            st.rerun()
+        elif not ok_fufs and st.button("⏭  Saltar paso 4 (ninguna confirmada)", key="btn_skip_fac"):
+            try:
+                df = pd.read_excel(PATH_NOTAS)
+                df.fillna(0, inplace=True)
+                w["notas_rows"] = df.to_dict("records")
+                w["notas_idx"] = 0; w["notas_ok"] = []
+            except Exception as e:
+                _append_log("err", f"No se pudo leer XiiXNotas.xlsx: {e}")
+            w["step"] = "rev_notas"
             st.rerun()
 
     # ══════════════════════════════════════════════════════════════════════════
-    # PASO 2 — Revisión de Notas + Folio
+    # rev_notas — Revisión nota por nota
     # ══════════════════════════════════════════════════════════════════════════
-    elif w["step"] == "review_notas":
+    elif w["step"] == "rev_notas":
         _show_log()
-        st.divider()
-        st.markdown("### Paso 5 · Notas de Crédito/Débito")
-        st.caption("Revisa las notas generadas y confirma antes de subir a Click Factura.")
+        rows = w["notas_rows"]
+        idx  = w["notas_idx"]
+        total_rows = len(rows)
 
-        try:
-            df_not = pd.read_excel(PATH_NOTAS)
-            df_not.fillna(0, inplace=True)
-            cols_show_n = [c for c in ["FUF","Participante","Periodo ECD","Importe Original","Monto Ajuste","IVA","TOTAL"]
-                           if c in df_not.columns]
-            st.dataframe(df_not[cols_show_n], use_container_width=True, hide_index=True)
-            total_n = df_not["TOTAL"].sum() if "TOTAL" in df_not.columns else 0
-            st.markdown(f"<div style='text-align:right;color:#FF6B35;font-weight:700;"
-                        f"margin-top:4px;'>Total: ${total_n:,.2f} · {len(df_not)} notas</div>",
-                        unsafe_allow_html=True)
-        except FileNotFoundError:
-            st.warning("XiiXNotas.xlsx no encontrado.")
-        except Exception as e:
-            st.warning(f"No se pudo cargar: {e}")
+        if idx >= total_rows:
+            w["step"] = "folio_notas"
+            st.rerun()
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"### Nota {idx+1} de {total_rows}")
+        _card(rows[idx], f"Nota {idx+1} / {total_rows}")
+        st.caption(f"Confirmadas: {len(w['notas_ok'])}  ·  Pendientes: {total_rows - idx}")
+
+        col_si2, col_no2 = st.columns(2)
+        with col_si2:
+            if st.button("✅  Correcta", key=f"nota_ok_{idx}", use_container_width=True):
+                w["notas_ok"].append(str(rows[idx].get("FUF","")))
+                w["notas_idx"] += 1
+                st.rerun()
+        with col_no2:
+            if st.button("⏭  Omitir", key=f"nota_skip_{idx}", use_container_width=True):
+                w["notas_idx"] += 1
+                st.rerun()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # folio_notas — Folio + subir notas confirmadas
+    # ══════════════════════════════════════════════════════════════════════════
+    elif w["step"] == "folio_notas":
+        _show_log()
+        ok_fufs = w["notas_ok"]
+        total_rows = len(w["notas_rows"])
+        st.markdown("### Paso 5 · Subir Notas")
+        st.markdown(f"**{len(ok_fufs)} de {total_rows} notas confirmadas** para subir a Click Factura.")
+        if ok_fufs:
+            st.code(", ".join(ok_fufs), language=None)
+        else:
+            st.warning("No confirmaste ninguna nota.")
+
         folio_notas = st.number_input("Ingresa el número de folio inicial para Notas:",
                                       min_value=1, step=1, value=1, key="w_folio_notas")
-        ok_notas = st.checkbox("✅  Las notas son correctas, subir a Click Factura",
-                               key="w_confirm_notas")
-
-        if st.button("▶  Subir Notas", key="btn_subir_notas", disabled=not ok_notas):
-            w["folio_notas"] = int(folio_notas)
-            _exec([_sys.executable, SCRIPT_NOTAS, "--folio", str(int(folio_notas))],
+        if ok_fufs and st.button("▶  Subir notas confirmadas", key="btn_subir_notas"):
+            _exec([_sys.executable, SCRIPT_NOTAS,
+                   "--folio", str(int(folio_notas)),
+                   "--include-fufs", ",".join(ok_fufs)],
                   "Paso 5 — Notas")
+            w["step"] = "done"
+            st.rerun()
+        elif not ok_fufs and st.button("⏭  Saltar paso 5 (ninguna confirmada)", key="btn_skip_notas"):
             w["step"] = "done"
             st.rerun()
 
     # ══════════════════════════════════════════════════════════════════════════
-    # DONE
+    # done
     # ══════════════════════════════════════════════════════════════════════════
     elif w["step"] == "done":
         _show_log()
         st.divider()
         st.success("🎉 Flujo de facturación semanal completado.")
         if st.button("🔄 Nuevo flujo semanal", key="btn_nuevo"):
-            st.session_state.fac_w = {"step": "inicio", "log": []}
+            st.session_state.fac_w = dict(_W0)
             st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════

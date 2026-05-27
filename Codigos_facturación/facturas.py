@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 
 _parser = argparse.ArgumentParser()
 _parser.add_argument("--folio", type=int, default=None)
+_parser.add_argument("--include-fufs", type=str, default=None,
+                     help="Comma-separated FUFs to process (default: all)")
 _args, _ = _parser.parse_known_args()
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +24,10 @@ BASE_FAC = os.environ.get(
 f = pd.read_csv(os.path.join(BASE_FAC, 'XiiXFacturas.csv'))
 f.replace("",0)
 f.fillna(0,inplace=True)
+
+if _args.include_fufs:
+    _include = set(x.strip() for x in _args.include_fufs.split(","))
+    f = f[f["FUF"].astype(str).isin(_include)].reset_index(drop=True)
 
 id_duplicados = f[f.duplicated(subset='FUF', keep=False)]
 id_unicos = f.drop_duplicates(subset='FUF', keep=False)
