@@ -49,14 +49,14 @@ def factura(rango,f,folio,auto_confirm=False):
             "Serie": "Factura",
             "Folio":\""""+str(folio)+"""\",
             "Fecha":\""""+str(dia)+"""\",
-            "SubTotal":\""""+str(round(f['Subtotal'][i]+f['Subtotal'][i+1],2))+"""\",
+            "SubTotal":\""""+f"{float(f['Subtotal'][i]+f['Subtotal'][i+1]):.2f}"+"""\",
             "Moneda": "MXN",
-            "Total":\""""+str(round(f['TOTAL'][i]+f['TOTAL'][i+1],2))+"""\",
+            "Total":\""""+f"{float(f['TOTAL'][i]+f['TOTAL'][i+1]):.2f}"+"""\",
             "TipoDeComprobante": "I",
             "FormaPago": "99",
             "MetodoPago": "PPD",
             "CondicionesDePago": "60 DIAS (TUA)",
-            "Descuento":\""""+str(f['Descuento'][i])+"""\",
+            "Descuento":\""""+f"{float(f['Descuento'][i]):.2f}"+"""\",
             "TipoCambio": "1",
             "LugarExpedicion": "05348",
             "Confirmacion":"" ,
@@ -122,10 +122,10 @@ def factura(rango,f,folio,auto_confirm=False):
                   "ClaveUnidad":\""""+f['ClaveUnidad'][i]+"""\",
                   "Unidad": \""""+f['Unidad'][i]+"""\",
                   "Descripcion": \""""+f['Descripcion'][i]+"""\",
-                  "Importe": \""""+str(f['Importe'][i])+"""\",  
+                  "Importe": \""""+f"{float(f['Importe'][i]):.2f}"+"""\",  
                   "Cantidad": \""""+str(f['Cantidad'][i])+"""\",
-                  "ValorUnitario": \""""+str(f['Precio Unitario'][i])+"""\",
-                  "Descuento":\""""+str(f['Descuento'][i])+"""\" ,
+                  "ValorUnitario": \""""+f"{float(f['Precio Unitario'][i]):.2f}"+"""\",
+                  "Descuento":\""""+f"{float(f['Descuento'][i]):.2f}"+"""\" ,
                   "ObjetoImp":"02",
                   "Impuestos": {
                     "Traslados": {
@@ -133,9 +133,9 @@ def factura(rango,f,folio,auto_confirm=False):
                         {
                           "Impuesto": "002",
                           "TasaOCuota": "0.160000",
-                          "Importe": \""""+str(f['IVA'][i])+"""\",
+                          "Importe": \""""+f"{float(f['IVA'][i]):.2f}"+"""\",
                           "TipoFactor":"Tasa",
-                          "Base": \""""+str(f['Importe'][i])+"""\"
+                          "Base": \""""+f"{float(f['Importe'][i]):.2f}"+"""\"
                         }
                       ]
                     },
@@ -151,10 +151,10 @@ def factura(rango,f,folio,auto_confirm=False):
                   "ClaveUnidad":\""""+f['ClaveUnidad'][i+1]+"""\",
                   "Unidad": \""""+f['Unidad'][i+1]+"""\",
                   "Descripcion": \""""+f['Descripcion'][i+1]+"""\",
-                  "Importe": \""""+str(f['Importe'][i+1])+"""\",  
+                  "Importe": \""""+f"{float(f['Importe'][i+1]):.2f}"+"""\",  
                   "Cantidad": \""""+str(f['Cantidad'][i+1])+"""\",
-                  "ValorUnitario": \""""+str(f['Precio Unitario'][i+1])+"""\",
-                  "Descuento":\""""+str(f['Descuento'][i+1])+"""\" ,
+                  "ValorUnitario": \""""+f"{float(f['Precio Unitario'][i+1]):.2f}"+"""\",
+                  "Descuento":\""""+f"{float(f['Descuento'][i+1]):.2f}"+"""\" ,
                   "ObjetoImp":"02",
                   "Impuestos": {
                     "Traslados": {
@@ -162,9 +162,9 @@ def factura(rango,f,folio,auto_confirm=False):
                         {
                           "Impuesto": "002",
                           "TasaOCuota": "0.160000",
-                          "Importe": \""""+str(f['IVA'][i+1])+"""\",
+                          "Importe": \""""+f"{float(f['IVA'][i+1]):.2f}"+"""\",
                           "TipoFactor":"Tasa",
-                          "Base": \""""+str(f['Importe'][i+1])+"""\"
+                          "Base": \""""+f"{float(f['Importe'][i+1]):.2f}"+"""\"
                         }
                       ]
                     },

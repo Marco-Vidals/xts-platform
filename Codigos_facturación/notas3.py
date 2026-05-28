@@ -52,21 +52,21 @@ def notas(rango,f,folio,auto_confirm=False):
         "NUM_LIN_0": "1",
         "LABEL_0": "LINADD",
         "FOLIO_UNICO_0": \"""" + str(f['No. Identificacion'][i]) + """\",
-        "IMPORTE_MODF_0": \"""" + str(round(f['Importe Modificado'][i], 2)) + """\",
-        "MONTO_AJUSTE_0": \"""" + str(round(f['Monto Ajuste'][i], 2)) + """\",
-        "IMPORTE_ORIG_0": \"""" + str(round(f['Importe Original'][i], 2)) + """\",
+        "IMPORTE_MODF_0": \"""" + f"{float(f['Importe Modificado'][i]):.2f}" + """\",
+        "MONTO_AJUSTE_0": \"""" + f"{float(f['Monto Ajuste'][i]):.2f}" + """\",
+        "IMPORTE_ORIG_0": \"""" + f"{float(f['Importe Original'][i]):.2f}" + """\",
         "NUM_LIN_1": "2",
         "LABEL_1": "LINADD",
         "FOLIO_UNICO_1": \"""" + str(f['No. Identificacion'][i + 1]) + """\",
-        "IMPORTE_MODF_1": \"""" + str(round(f['Importe Modificado'][i + 1], 2)) + """\",
-        "MONTO_AJUSTE_1": \"""" + str(round(f['Monto Ajuste'][i + 1], 2)) + """\",
-        "IMPORTE_ORIG_1": \"""" + str(round(f['Importe Original'][i + 1], 2)) + """\",
+        "IMPORTE_MODF_1": \"""" + f"{float(f['Importe Modificado'][i + 1]):.2f}" + """\",
+        "MONTO_AJUSTE_1": \"""" + f"{float(f['Monto Ajuste'][i + 1]):.2f}" + """\",
+        "IMPORTE_ORIG_1": \"""" + f"{float(f['Importe Original'][i + 1]):.2f}" + """\",
         "NUM_LIN_2": "3",
         "LABEL_2": "LINADD",
         "FOLIO_UNICO_2": \"""" + str(f['No. Identificacion'][i + 2]) + """\",
-        "IMPORTE_MODF_2": \"""" + str(round(f['Importe Modificado'][i + 2], 2)) + """\",
-        "MONTO_AJUSTE_2": \"""" + str(round(f['Monto Ajuste'][i + 2], 2)) + """\",
-        "IMPORTE_ORIG_2": \"""" + str(round(f['Importe Original'][i + 2], 2)) + """\"
+        "IMPORTE_MODF_2": \"""" + f"{float(f['Importe Modificado'][i + 2]):.2f}" + """\",
+        "MONTO_AJUSTE_2": \"""" + f"{float(f['Monto Ajuste'][i + 2]):.2f}" + """\",
+        "IMPORTE_ORIG_2": \"""" + f"{float(f['Importe Original'][i + 2]):.2f}" + """\"
       },
       "Comprobante": {
         "Exportacion": "01",
@@ -80,7 +80,7 @@ def notas(rango,f,folio,auto_confirm=False):
         "FormaPago": "99",
         "MetodoPago": "PPD",
         "CondicionesDePago": "60 DIAS (TUA)",
-        "Descuento": \""""+str(round(f['Descuento'][i],2))+"""\",
+        "Descuento": \""""+f"{float(f['Descuento'][i]):.2f}"+"""\",
         "TipoCambio": "1",
         "LugarExpedicion": "05348",
         "Confirmacion": "",
@@ -137,13 +137,13 @@ def notas(rango,f,folio,auto_confirm=False):
               "ClaveUnidad": \""""+f['ClaveUnidad'][i]+"""\",
               "Unidad": \""""+f['Unidad'][i]+"""\",
               "Descripcion": \""""+f['Descripcion'][i]+"""\",
-              "Importe": \""""+str(round(f['Importe'][i],2))+"""\",
+              "Importe": \""""+f"{float(f['Importe'][i]):.2f}"+"""\",
               "Cantidad": \""""+str(round(f['Cantidad'][i],2))+"""\",
-              "ValorUnitario": \""""+str(round(f['Precio Unitario'][i],2))+"""\",
-              "IMPORTE_ORIG": \""""+str(round(f['Importe Original'][i],2))+"""\",
-              "IMPORTE_MODF": \""""+str(round(f['Importe Modificado'][i],2))+"""\",
-              "MONTO_AJUSTE": \""""+str(round(f['Monto Ajuste'][i],2))+"""\",
-              "Descuento": \""""+str(f['Descuento'][i])+"""\",
+              "ValorUnitario": \""""+f"{float(f['Precio Unitario'][i]):.2f}"+"""\",
+              "IMPORTE_ORIG": \""""+f"{float(f['Importe Original'][i]):.2f}"+"""\",
+              "IMPORTE_MODF": \""""+f"{float(f['Importe Modificado'][i]):.2f}"+"""\",
+              "MONTO_AJUSTE": \""""+f"{float(f['Monto Ajuste'][i]):.2f}"+"""\",
+              "Descuento": \""""+f"{float(f['Descuento'][i]):.2f}"+"""\",
               "ObjetoImp": "02",
               "Impuestos": {
                 "Traslados": {
@@ -151,9 +151,9 @@ def notas(rango,f,folio,auto_confirm=False):
                     {
                       "Impuesto": "002",
                       "TasaOCuota": "0.160000",
-                      "Importe": \""""+str(round(f['Importe'][i]*0.16,2))+"""\",
+                      "Importe": \""""+f"{float(f['Importe'][i])*0.16:.2f}"+"""\",
                       "TipoFactor": "Tasa",
-                      "Base": \""""+str(round(f['Importe'][i],2))+"""\"
+                      "Base": \""""+f"{float(f['Importe'][i]):.2f}"+"""\"
                     }
                   ]
                 },
@@ -171,13 +171,13 @@ def notas(rango,f,folio,auto_confirm=False):
                "ClaveUnidad": \""""+f['ClaveUnidad'][i+1]+"""\",
                "Unidad": \""""+f['Unidad'][i+1]+"""\",
                "Descripcion": \""""+f['Descripcion'][i+1]+"""\",
-               "Importe": \""""+str(round(f['Importe'][i+1],2))+"""\",
+               "Importe": \""""+f"{float(f['Importe'][i+1]):.2f}"+"""\",
                "Cantidad": \""""+str(round(f['Cantidad'][i+1],2))+"""\",
-               "ValorUnitario": \""""+str(round(f['Precio Unitario'][i+1],2))+"""\",
-               "IMPORTE_ORIG": \""""+str(round(f['Importe Original'][i+1],2))+"""\",
-               "IMPORTE_MODF": \""""+str(round(f['Importe Modificado'][i+1],2))+"""\",
-               "MONTO_AJUSTE": \""""+str(round(f['Monto Ajuste'][i+1],2))+"""\",
-               "Descuento": \""""+str(f['Descuento'][i+1])+"""\",
+               "ValorUnitario": \""""+f"{float(f['Precio Unitario'][i+1]):.2f}"+"""\",
+               "IMPORTE_ORIG": \""""+f"{float(f['Importe Original'][i+1]):.2f}"+"""\",
+               "IMPORTE_MODF": \""""+f"{float(f['Importe Modificado'][i+1]):.2f}"+"""\",
+               "MONTO_AJUSTE": \""""+f"{float(f['Monto Ajuste'][i+1]):.2f}"+"""\",
+               "Descuento": \""""+f"{float(f['Descuento'][i+1]):.2f}"+"""\",
                "ObjetoImp": "02",
                "Impuestos": {
                  "Traslados": {
@@ -185,9 +185,9 @@ def notas(rango,f,folio,auto_confirm=False):
                      {
                        "Impuesto": "002",
                        "TasaOCuota": "0.160000",
-                       "Importe": \""""+str(round(f['Importe'][i+1]*0.16,2))+"""\",
+                       "Importe": \""""+f"{float(f['Importe'][i+1])*0.16:.2f}"+"""\",
                        "TipoFactor": "Tasa",
-                       "Base": \""""+str(round(f['Importe'][i+1],2))+"""\"
+                       "Base": \""""+f"{float(f['Importe'][i+1]):.2f}"+"""\"
                      }
                    ]
                  },
@@ -205,13 +205,13 @@ def notas(rango,f,folio,auto_confirm=False):
                "ClaveUnidad": \""""+f['ClaveUnidad'][i+2]+"""\",
                "Unidad": \""""+f['Unidad'][i+2]+"""\",
                "Descripcion": \""""+f['Descripcion'][i+2]+"""\",
-               "Importe": \""""+str(round(f['Importe'][i+2],2))+"""\",
+               "Importe": \""""+f"{float(f['Importe'][i+2]):.2f}"+"""\",
                "Cantidad": \""""+str(round(f['Cantidad'][i+2],2))+"""\",
-               "ValorUnitario": \""""+str(round(f['Precio Unitario'][i+2],2))+"""\",
-               "IMPORTE_ORIG": \""""+str(round(f['Importe Original'][i+2],2))+"""\",
-               "IMPORTE_MODF": \""""+str(round(f['Importe Modificado'][i+2],2))+"""\",
-               "MONTO_AJUSTE": \""""+str(round(f['Monto Ajuste'][i+2],2))+"""\",
-               "Descuento": \""""+str(f['Descuento'][i+2])+"""\",
+               "ValorUnitario": \""""+f"{float(f['Precio Unitario'][i+2]):.2f}"+"""\",
+               "IMPORTE_ORIG": \""""+f"{float(f['Importe Original'][i+2]):.2f}"+"""\",
+               "IMPORTE_MODF": \""""+f"{float(f['Importe Modificado'][i+2]):.2f}"+"""\",
+               "MONTO_AJUSTE": \""""+f"{float(f['Monto Ajuste'][i+2]):.2f}"+"""\",
+               "Descuento": \""""+f"{float(f['Descuento'][i+2]):.2f}"+"""\",
                "ObjetoImp": "02",
                "Impuestos": {
                  "Traslados": {
@@ -219,9 +219,9 @@ def notas(rango,f,folio,auto_confirm=False):
                      {
                        "Impuesto": "002",
                        "TasaOCuota": "0.160000",
-                       "Importe": \""""+str(round(f['Importe'][i+2]*0.16,2))+"""\",
+                       "Importe": \""""+f"{float(f['Importe'][i+2])*0.16:.2f}"+"""\",
                        "TipoFactor": "Tasa",
-                       "Base": \""""+str(round(f['Importe'][i+2],2))+"""\"
+                       "Base": \""""+f"{float(f['Importe'][i+2]):.2f}"+"""\"
                      }
                    ]
                  },

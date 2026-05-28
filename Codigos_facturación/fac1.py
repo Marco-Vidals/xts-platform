@@ -44,9 +44,9 @@ def factura(rango,f,folio,auto_confirm=False):
             "Serie": "Factura",
             "Folio":\""""+str(folio)+"""\",
             "Fecha":\""""+str(dia)+"""\",
-            "SubTotal":\""""+str(f['Subtotal'][i])+"""\",
+            "SubTotal":\""""+f"{float(f['Subtotal'][i]):.2f}"+"""\",
             "Moneda": "MXN",
-            "Total":\""""+str(f['TOTAL'][i])+"""\",
+            "Total":\""""+f"{float(f['TOTAL'][i]):.2f}"+"""\",
             "TipoDeComprobante": "I",
             "FormaPago": "99",
             "MetodoPago": "PPD",
@@ -117,10 +117,10 @@ def factura(rango,f,folio,auto_confirm=False):
                   "ClaveUnidad":\""""+f['ClaveUnidad'][i]+"""\",
                   "Unidad": \""""+f['Unidad'][i]+"""\",
                   "Descripcion": \""""+f['Descripcion'][i]+"""\",
-                  "Importe": \""""+str(f['Importe'][i])+"""\",  
+                  "Importe": \""""+f"{float(f['Importe'][i]):.2f}"+"""\",
                   "Cantidad": \""""+str(f['Cantidad'][i])+"""\",
-                  "ValorUnitario": \""""+str(f['Precio Unitario'][i])+"""\",
-                  "Descuento":\""""+str(f['Descuento'][i])+"""\" ,
+                  "ValorUnitario": \""""+f"{float(f['Precio Unitario'][i]):.2f}"+"""\",
+                  "Descuento":\""""+f"{float(f['Descuento'][i]):.2f}"+"""\" ,
                   "ObjetoImp":"02",
                   "Impuestos": {
                     "Traslados": {
@@ -128,9 +128,9 @@ def factura(rango,f,folio,auto_confirm=False):
                         {
                           "Impuesto": "002",
                           "TasaOCuota": "0.160000",
-                          "Importe": \""""+str(f['IVA'][i])+"""\",
+                          "Importe": \""""+f"{float(f['IVA'][i]):.2f}"+"""\",
                           "TipoFactor":"Tasa",
-                          "Base": \""""+str(f['Importe'][i])+"""\"
+                          "Base": \""""+f"{float(f['Importe'][i]):.2f}"+"""\"
                         }
                       ]
                     },
