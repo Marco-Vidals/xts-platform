@@ -21,7 +21,8 @@ def notas(rango,f,folio,auto_confirm=False):
             t_rel='02'
         folio=int(folio)+1
         print(folio)
-        dia=datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        _mexico = datetime.timezone(datetime.timedelta(hours=-6))
+        dia=datetime.datetime.now(_mexico).strftime("%Y-%m-%dT%H:%M:%S")
         periodo=(str(f['Periodo ECD'][i]))
         limite=str(f['Fecha Limite de Pago'][i])
         perecd=f"{periodo[8:10]}-{periodo[5:7]}-{periodo[0:4]}"

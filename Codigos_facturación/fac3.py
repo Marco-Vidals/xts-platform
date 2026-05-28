@@ -13,7 +13,8 @@ def factura(rango,f,folio,auto_confirm=False):
     #print(folio)
         folio=int(folio)+1
         print(folio)
-        dia=datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        _mexico = datetime.timezone(datetime.timedelta(hours=-6))
+        dia=datetime.datetime.now(_mexico).strftime("%Y-%m-%dT%H:%M:%S")
         perecd=f"{f['Periodo ECD'][i][8:]}-{f['Periodo ECD'][i][5:7]}-{f['Periodo ECD'][i][0:4]}"
         flimite=f"{f['Fecha Limite de Pago'][i][8:]}-{f['Fecha Limite de Pago'][i][5:7]}-{f['Fecha Limite de Pago'][i][0:4]}"
         perecd2=f"{f['Periodo ECD'][i][:4]}-{f['Periodo ECD'][i][5:7]}-{f['Periodo ECD'][i][8:]}"
