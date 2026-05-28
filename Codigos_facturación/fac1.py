@@ -159,6 +159,8 @@ def factura(rango,f,folio,auto_confirm=False):
         print('¿Es correcta la factura?')
         val = 'y' if auto_confirm else input('y/n:')
         if val=='y':
+            with open('/tmp/cfdi_body_debug.txt', 'w', encoding='utf-8') as _dbg:
+                _dbg.write(body)
             response=requests.post(url, data=body.encode('utf-8'), headers=heads)
             print(f'[DEBUG] Status: {response.status_code}')
             print(f'[DEBUG] Response: {response.text[:1000]}')
